@@ -67,19 +67,27 @@ triplens/
 └── build.gradle.kts
 ```
 
-### 1.2 Map SDK: Mapbox Maps SDK
+### 1.2 Map SDK: MapLibre GL Native + OpenFreeMap
 
-**Decision for Q3**: Use **Mapbox**.
+**Decision for Q3**: Use **MapLibre GL Native** with **OpenFreeMap** tiles.
 
 **Rationale**:
 
-- Google Maps requires a Google Play Services dependency and an API key tied to billing. Offline tile support requires the paid Maps Platform.
-- Mapbox offers a generous free tier (25,000 mobile users/month), native offline map pack downloads (critical for the high-priority future feature), and a good Compose integration via `mapbox-maps-compose`.
-- OpenStreetMap-based options (osmdroid, MapLibre) are free but require self-hosting tile servers or using third-party tile services. MapLibre is viable but has less polish and no built-in offline pack management.
+A core principle of TripLens is zero cost and zero dependency on third-party subscriptions for the developer. This rules out options that require API keys tied to billing:
 
-Mapbox also works well with Compose Multiplatform and has an iOS SDK, aligning with the cross-platform strategy.
+- **Google Maps**: Requires a Google Play Services dependency and an API key tied to a billing account. Even the free tier requires a credit card on file.
+- **Mapbox**: Generous free tier (25,000 users/month), but still requires an API key and account. Usage beyond the free tier incurs charges. The SDK license (post-2020) is proprietary.
+- **MapLibre GL Native**: The open-source fork of Mapbox GL (BSD license), created after Mapbox changed their license. Fully free with no API key, no usage limits, no proprietary dependencies. Renders vector tiles with good performance and visual quality.
 
-**Fallback**: If Mapbox licensing becomes a concern, MapLibre GL Native is a drop-in replacement with compatible style specs.
+**Tile source**: **OpenFreeMap** provides free vector tiles based on OpenStreetMap data, with no API key required and no usage limits. Tile URL pattern: `https://tiles.openfreemap.org/styles/{style}`. Available styles include "bright", "positron", and "dark matter" — the latter two map well to TripLens's light/dark mode.
+
+**Compose integration**: MapLibre doesn't have an official Compose wrapper as polished as Mapbox's. Options:
+- **ramani-maps**: Community-maintained Compose wrapper for MapLibre. Actively developed and sufficient for TripLens's needs (polyline rendering, markers, camera follow).
+- **AndroidView interop**: Wrap MapLibre's `MapView` in a Compose `AndroidView` as a fallback if ramani-maps proves insufficient.
+
+**OSM data quality**: For TripLens's use case (displaying trajectory lines and media markers on a street map), OpenStreetMap data quality is excellent in urban areas worldwide and particularly strong in Europe, Japan, and New Zealand. The map is a background canvas, not a navigation or POI discovery tool, so the areas where Google Maps excels (business data, satellite imagery) are not relevant.
+
+**Future offline support**: When the offline map feature from the roadmap is implemented, MapLibre supports PMTiles (a single-file tile archive format). Users could download regional tilesets for offline use at zero cost — a significant advantage over Mapbox and Google Maps, which both charge for offline tile downloads.
 
 ### 1.3 Desktop Tool: Tauri v2
 
@@ -866,7 +874,7 @@ The `CalibrationStep` and `MatchPreviewStep` are tightly coupled: adjusting the 
 
 ### 9.4 Map Integration (Desktop)
 
-For the desktop match preview map, use **Leaflet** with OpenStreetMap tiles. Leaflet is lightweight, free, and well-suited for a read-only map with markers. No need for Mapbox on desktop since there are no offline requirements.
+For the desktop match preview map, use **Leaflet** with **OpenFreeMap** tiles (same tile source as the mobile app, ensuring visual consistency). Leaflet is lightweight, free, and well-suited for a read-only map with markers.
 
 ---
 
@@ -1182,7 +1190,7 @@ Resolved PRD open questions:
 |----|----------|----------|-----------|
 | Q1 | Export file format | index.json v1 schema defined in Section 7.2; GPX 1.1 with extensions | Compact key names for track points; schema version field for future compat |
 | Q2 | Mobile framework | Kotlin Multiplatform + Compose Multiplatform | ~60% shared code (data/domain), native platform APIs, clear iOS migration path |
-| Q3 | Map SDK | Mapbox Maps SDK | Free tier sufficient for MVP, offline tile support for future, good Compose integration |
+| Q3 | Map SDK | MapLibre GL Native + OpenFreeMap tiles | Fully free (no API key, no usage limits, no billing), OSM data quality sufficient for trajectory display, PMTiles support enables free offline maps in future |
 | Q4 | Desktop framework | Tauri v2 (Rust + React/TypeScript) | ~5-10MB bundle, Rust is ideal for EXIF/file I/O, cross-platform from day 1 |
 | Q5 | Voice note format | M4A (AAC-LC, 64kbps, mono) | ~480KB/min, native Android MediaRecorder support, broad playback compatibility |
 | Q6 | Auto-pause behavior | Auto-pause after 3h stationary; reduce GPS to 1 fix per 5 min | Prevents useless overnight data; resumes automatically on movement |
@@ -1200,7 +1208,8 @@ Resolved PRD open questions:
 | Compose Multiplatform | UI framework | 1.7.x |
 | SQLDelight | Local database | 2.0.x |
 | Koin | Dependency injection | 4.0.x |
-| Mapbox Maps SDK | Map rendering | 11.x |
+| MapLibre GL Native | Map rendering | 11.x |
+| ramani-maps | Compose wrapper for MapLibre | latest |
 | Google Play Services Location | Fused location provider | 21.x |
 | AndroidX Navigation Compose | Navigation | 2.8.x |
 | Kotlinx Serialization | JSON serialization | 1.7.x |

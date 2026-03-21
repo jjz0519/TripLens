@@ -225,7 +225,7 @@ When a recording is active, the app opens to **Home / Recording Screen** as the 
 - Right edge: "Stop" (结束) button
 
 **Map area (地图区域, ~60% of screen height)**:
-- Full-width interactive map (use a standard map SDK, e.g. Google Maps or Mapbox)
+- Full-width interactive map (MapLibre GL Native + OpenFreeMap tiles)
 - The recorded trajectory is drawn as a colored polyline on the map
   - Color-coded by transport mode:
     - `stationary`: gray
@@ -566,7 +566,7 @@ For MVP, since there is no analytics or telemetry, success is measured qualitati
 |---|---|---|---|
 | Q1 | Exact export file format (index.json schema, GPX options) | TODO | To be finalized during technical design |
 | Q2 | Cross-platform framework choice for mobile app (native Android vs Flutter vs React Native vs Kotlin Multiplatform) | TODO | Must consider future iOS port. To be decided in technical design. |
-| Q3 | Map SDK selection (Google Maps vs Mapbox vs OpenStreetMap-based) | TODO | Consider offline support needs and licensing costs |
+| Q3 | Map SDK selection (Google Maps vs Mapbox vs OpenStreetMap-based) | **Decided** | MapLibre GL Native + OpenFreeMap tiles. Fully free, no API key or billing required. OSM data quality is sufficient for trajectory display. See TDD Section 1.2. |
 | Q4 | Electron vs Tauri for desktop tool | TODO | Tauri is lighter-weight but less mature. To be evaluated. |
 | Q5 | Voice note audio format and compression | TODO | M4A (AAC) is preferred for quality/size balance |
 | Q6 | Maximum session duration / auto-pause behavior | TODO | What happens if user forgets to stop recording overnight? Consider auto-pause after X hours of `stationary` mode. |
