@@ -94,6 +94,7 @@ triplens-{name}-{date}/
 ### Collaboration Model
 - This repo is maintained by Claude (code author) and one human owner. Treat every session as if Claude is the primary developer who needs to re-orient from context alone.
 - Keep `CLAUDE.md` up to date as the primary orientation document. When adding non-obvious architecture decisions or changing direction on something previously decided, update this file or add a note to `docs/`.
+- **Always ask for clarification before starting any non-trivial task.** Do not assume intent or begin implementation until the human owner has confirmed the approach.
 
 ### Comments & Documentation
 - Add inline comments for every non-obvious decision: why a threshold was chosen, why a specific API was used, why a code path exists.
