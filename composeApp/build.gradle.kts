@@ -1,11 +1,10 @@
-import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
-    alias(libs.plugins.kotlinMultiplatform)
-    alias(libs.plugins.androidApplication)
-    alias(libs.plugins.composeMultiplatform)
-    alias(libs.plugins.composeCompiler)
+    alias(libs.plugins.android.application)
+    alias(libs.plugins.kotlin.multiplatform)
+    alias(libs.plugins.compose.multiplatform)
+    alias(libs.plugins.compose.compiler)
 }
 
 kotlin {
@@ -14,36 +13,34 @@ kotlin {
             jvmTarget.set(JvmTarget.JVM_11)
         }
     }
-    
     sourceSets {
         androidMain.dependencies {
-            implementation(libs.compose.uiToolingPreview)
+            implementation(project(":shared"))
+            implementation(libs.androidx.core.ktx)
+            implementation(libs.androidx.lifecycle.viewmodel)
             implementation(libs.androidx.activity.compose)
+            implementation(libs.navigation.compose)
+            implementation(libs.play.services.location)
+            implementation(libs.koin.android)
+            implementation(libs.coil.compose)
+            implementation(libs.kotlinx.coroutines.android)
         }
         commonMain.dependencies {
-            implementation(libs.compose.runtime)
-            implementation(libs.compose.foundation)
-            implementation(libs.compose.material3)
-            implementation(libs.compose.ui)
-            implementation(libs.compose.components.resources)
-            implementation(libs.compose.uiToolingPreview)
-            implementation(libs.androidx.lifecycle.viewmodelCompose)
-            implementation(libs.androidx.lifecycle.runtimeCompose)
+            implementation(libs.kotlinx.coroutines.core)
         }
         commonTest.dependencies {
-            implementation(libs.kotlin.test)
+            implementation(kotlin("test"))
         }
     }
 }
 
 android {
     namespace = "com.cooldog.triplens"
-    compileSdk = libs.versions.android.compileSdk.get().toInt()
-
+    compileSdk = 35
     defaultConfig {
         applicationId = "com.cooldog.triplens"
-        minSdk = libs.versions.android.minSdk.get().toInt()
-        targetSdk = libs.versions.android.targetSdk.get().toInt()
+        minSdk = 26
+        targetSdk = 35
         versionCode = 1
         versionName = "1.0"
     }
@@ -62,8 +59,3 @@ android {
         targetCompatibility = JavaVersion.VERSION_11
     }
 }
-
-dependencies {
-    debugImplementation(libs.compose.uiTooling)
-}
-
