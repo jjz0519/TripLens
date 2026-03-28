@@ -26,6 +26,12 @@ kotlin {
             implementation(libs.kotlinx.coroutines.android)
         }
         commonMain.dependencies {
+            implementation(compose.runtime)
+            implementation(compose.foundation)
+            implementation(compose.material3)
+            implementation(compose.ui)
+            implementation(compose.components.resources)
+            implementation(compose.components.uiToolingPreview)
             implementation(libs.kotlinx.coroutines.core)
         }
         commonTest.dependencies {
@@ -34,13 +40,19 @@ kotlin {
     }
 }
 
+// compose.uiTooling must be debugImplementation via the Android dependency block,
+// not a KMP source set — KMP has no androidDebug source set concept.
+dependencies {
+    debugImplementation(compose.uiTooling)
+}
+
 android {
     namespace = "com.cooldog.triplens"
-    compileSdk = 35
+    compileSdk = 36
     defaultConfig {
         applicationId = "com.cooldog.triplens"
         minSdk = 26
-        targetSdk = 35
+        targetSdk = 36
         versionCode = 1
         versionName = "1.0"
     }
