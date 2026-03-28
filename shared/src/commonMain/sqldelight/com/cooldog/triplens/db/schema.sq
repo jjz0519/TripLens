@@ -1,0 +1,66 @@
+-- TripLens SQLite schema. All timestamps are epoch milliseconds UTC.
+-- Lowercase CHECK values must match TransportMode and SessionStatus serial names.
+
+CREATE TABLE trip_group (
+    id         TEXT    NOT NULL PRIMARY KEY,
+    name       TEXT    NOT NULL,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+);
+
+CREATE TABLE session (
+    id         TEXT    NOT NULL PRIMARY KEY,
+    group_id   TEXT    NOT NULL REFERENCES trip_group(id) ON DELETE CASCADE,
+    name       TEXT    NOT NULL,
+    start_time INTEGER NOT NULL,
+    end_time   INTEGER,
+    status     TEXT    NOT NULL DEFAULT 'recording'
+        CHECK (status IN ('recording', 'completed', 'interrupted'))
+);
+
+CREATE TABLE track_point (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id     TEXT    NOT NULL REFERENCES session(id) ON DELETE CASCADE,
+    timestamp      INTEGER NOT NULL,
+    latitude       REAL    NOT NULL,
+    longitude      REAL    NOT NULL,
+    altitude       REAL,
+    accuracy       REAL    NOT NULL,
+    speed          REAL,
+    transport_mode TEXT    NOT NULL DEFAULT 'stationary'
+        CHECK (transport_mode IN ('stationary','walking','cycling','driving','fast_transit'))
+);
+CREATE INDEX idx_tp_session_time ON track_point(session_id, timestamp);
+
+CREATE TABLE media_reference (
+    id                   TEXT    NOT NULL PRIMARY KEY,
+    session_id           TEXT    NOT NULL REFERENCES session(id) ON DELETE CASCADE,
+    type                 TEXT    NOT NULL CHECK (type IN ('photo','video')),
+    source               TEXT    NOT NULL CHECK (source IN ('phone_gallery','external_camera')),
+    content_uri          TEXT,
+    original_filename    TEXT,
+    captured_at          INTEGER NOT NULL,
+    timestamp_offset     INTEGER NOT NULL DEFAULT 0,
+    original_lat         REAL,
+    original_lng         REAL,
+    inferred_lat         REAL,
+    inferred_lng         REAL,
+    location_source      TEXT    CHECK (location_source IN ('exif','trajectory')),
+    matched_session_id   TEXT,
+    matched_trackpoint_id INTEGER
+);
+CREATE INDEX idx_mr_session   ON media_reference(session_id);
+CREATE INDEX idx_mr_captured  ON media_reference(captured_at);
+
+CREATE TABLE note (
+    id               TEXT    NOT NULL PRIMARY KEY,
+    session_id       TEXT    NOT NULL REFERENCES session(id) ON DELETE CASCADE,
+    type             TEXT    NOT NULL CHECK (type IN ('text','voice')),
+    content          TEXT,
+    audio_filename   TEXT,
+    duration_seconds INTEGER,
+    created_at       INTEGER NOT NULL,
+    latitude         REAL    NOT NULL,
+    longitude        REAL    NOT NULL
+);
+CREATE INDEX idx_note_session ON note(session_id);

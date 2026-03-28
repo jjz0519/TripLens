@@ -1,0 +1,21 @@
+insert:
+INSERT INTO session(id, group_id, name, start_time, end_time, status)
+VALUES (?, ?, ?, ?, ?, ?);
+
+getById:
+SELECT * FROM session WHERE id = ?;
+
+getByGroupId:
+SELECT * FROM session WHERE group_id = ? ORDER BY start_time ASC;
+
+updateStatus:
+UPDATE session SET status = ? WHERE id = ?;
+
+setEndTime:
+UPDATE session SET end_time = ?, status = 'completed' WHERE id = ?;
+
+getActiveSession:
+SELECT * FROM session WHERE status = 'recording' LIMIT 1;
+
+delete:
+DELETE FROM session WHERE id = ?;

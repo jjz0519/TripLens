@@ -1,0 +1,15 @@
+insert:
+INSERT INTO trip_group(id, name, created_at, updated_at)
+VALUES (?, ?, ?, ?);
+
+getById:
+SELECT * FROM trip_group WHERE id = ?;
+
+getAll:
+SELECT * FROM trip_group ORDER BY created_at DESC;
+
+updateName:
+UPDATE trip_group SET name = ?, updated_at = ? WHERE id = ?;
+
+delete:
+DELETE FROM trip_group WHERE id = ?;

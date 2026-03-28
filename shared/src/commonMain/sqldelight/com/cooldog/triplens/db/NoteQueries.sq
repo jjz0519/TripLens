@@ -1,0 +1,12 @@
+insert:
+INSERT INTO note(id, session_id, type, content, audio_filename, duration_seconds, created_at, latitude, longitude)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+getBySessionId:
+SELECT * FROM note WHERE session_id = ? ORDER BY created_at ASC;
+
+getVoiceNotesBySession:
+SELECT * FROM note WHERE session_id = ? AND type = 'voice' ORDER BY created_at ASC;
+
+delete:
+DELETE FROM note WHERE id = ?;

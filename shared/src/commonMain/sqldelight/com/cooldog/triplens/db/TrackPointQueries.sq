@@ -1,0 +1,14 @@
+insert:
+INSERT INTO track_point(session_id, timestamp, latitude, longitude, altitude, accuracy, speed, transport_mode)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+
+getBySessionId:
+SELECT * FROM track_point WHERE session_id = ? ORDER BY timestamp ASC;
+
+getBySessionIdAndTimeRange:
+SELECT * FROM track_point
+WHERE session_id = ? AND timestamp >= ? AND timestamp <= ?
+ORDER BY timestamp ASC;
+
+countBySession:
+SELECT COUNT(*) FROM track_point WHERE session_id = ?;

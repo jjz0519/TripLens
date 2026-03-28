@@ -1,0 +1,17 @@
+insert:
+INSERT INTO media_reference(
+    id, session_id, type, source, content_uri, original_filename,
+    captured_at, timestamp_offset, original_lat, original_lng,
+    inferred_lat, inferred_lng, location_source, matched_session_id, matched_trackpoint_id
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+getBySessionId:
+SELECT * FROM media_reference WHERE session_id = ? ORDER BY captured_at ASC;
+
+getByContentUri:
+SELECT * FROM media_reference WHERE content_uri = ? LIMIT 1;
+
+updateInferredLocation:
+UPDATE media_reference
+SET inferred_lat = ?, inferred_lng = ?, location_source = 'trajectory'
+WHERE id = ?;
