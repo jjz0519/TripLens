@@ -20,7 +20,7 @@ Each task entry:
 
 ### Task 1: KMP Project Initialization
 
-**Goal**: Create the Gradle project with `shared/` and `androidApp/` modules, all dependency declarations, and a compiling but empty app shell.
+**Goal**: Create the Gradle project with `shared/` and `composeApp/` modules, all dependency declarations, and a compiling but empty app shell.
 
 **Depends on**: nothing
 
@@ -28,9 +28,9 @@ Each task entry:
 - `build.gradle.kts` (root)
 - `gradle/libs.versions.toml` — version catalog for all dependencies (KMP 2.1.x, Compose Multiplatform 1.7.x, SQLDelight 2.0.x, Koin 4.0.x, MapLibre 11.x, ramani-maps, Coil 3.x, Navigation Compose 2.8.x, Kotlinx Serialization 1.7.x, Kotlinx Coroutines 1.9.x, Google Play Services Location 21.x)
 - `shared/build.gradle.kts` — KMP module with `commonMain`, `androidMain`, `iosMain` source sets declared
-- `androidApp/build.gradle.kts`
-- `androidApp/src/main/AndroidManifest.xml` — all permissions declared (not yet requested at runtime): `ACCESS_FINE_LOCATION`, `ACCESS_BACKGROUND_LOCATION`, `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_LOCATION`, `RECORD_AUDIO`, `READ_MEDIA_IMAGES`, `ACCESS_MEDIA_LOCATION`
-- `androidApp/src/main/java/.../MainActivity.kt` — empty single-activity shell
+- `composeApp/build.gradle.kts`
+- `composeApp/src/main/AndroidManifest.xml` — all permissions declared (not yet requested at runtime): `ACCESS_FINE_LOCATION`, `ACCESS_BACKGROUND_LOCATION`, `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_LOCATION`, `RECORD_AUDIO`, `READ_MEDIA_IMAGES`, `ACCESS_MEDIA_LOCATION`
+- `composeApp/src/main/java/.../MainActivity.kt` — empty single-activity shell
 - `.gitignore` additions for Android/Gradle build artifacts
 
 **Tests to propose**: none (scaffold only — verified by successful Gradle sync and empty app launching on emulator)
@@ -143,7 +143,7 @@ Each task entry:
 **Depends on**: Tasks 4, 5
 
 **Scope**:
-- `androidApp/src/main/java/.../service/LocationTrackingService.kt` — extends `Service`, uses `FusedLocationProviderClient`, calls `TransportClassifier.classify()`, writes TrackPoints via `TrackPointRepository`, buffers up to 10 points before flushing in one transaction
+- `composeApp/src/main/java/.../service/LocationTrackingService.kt` — extends `Service`, uses `FusedLocationProviderClient`, calls `TransportClassifier.classify()`, writes TrackPoints via `TrackPointRepository`, buffers up to 10 points before flushing in one transaction
 - `AccuracyProfile.kt` (enum: STANDARD, HIGH, BATTERY_SAVER with interval and priority values from TDD Section 4.2)
 - `LocationProvider.kt` (`expect` interface in `commonMain`) + `AndroidLocationProvider.kt` (`actual` in `androidMain`)
 - SharedPreferences keys: `active_session_id`, `accuracy_profile` — read on `onStartCommand` when intent is null (system restart)
@@ -166,7 +166,7 @@ Each task entry:
 
 **Scope**:
 - `GalleryScanner.kt` (`expect` interface in `commonMain`)
-- `androidApp/src/main/.../AndroidGalleryScanner.kt` (`actual`) — queries `MediaStore.Images.Media` and `MediaStore.Video.Media` with `DATE_TAKEN > sessionStartTime AND DATE_TAKEN > lastScanTimestamp`; reads `LATITUDE`/`LONGITUDE` columns for phone photos; builds `ScannedMedia` objects; tracks `lastScanTimestamp`
+- `composeApp/src/main/.../AndroidGalleryScanner.kt` (`actual`) — queries `MediaStore.Images.Media` and `MediaStore.Video.Media` with `DATE_TAKEN > sessionStartTime AND DATE_TAKEN > lastScanTimestamp`; reads `LATITUDE`/`LONGITUDE` columns for phone photos; builds `ScannedMedia` objects; tracks `lastScanTimestamp`
 - `ScannedMedia.kt` data class (content_uri, filename, capturedAt, originalLat, originalLng)
 - `ACCESS_MEDIA_LOCATION` handling: if not granted, `originalLat/Lng` = null (location will be inferred from trajectory)
 
@@ -188,7 +188,7 @@ Each task entry:
 
 **Scope**:
 - `AudioRecorder.kt` (`expect` interface in `commonMain`) with `start()`, `stop(): String` (returns file path), `cancel()`
-- `androidApp/src/main/.../AndroidAudioRecorder.kt` (`actual`) — uses `android.media.MediaRecorder`; output format `MPEG_4`, audio encoder `AAC`, bit rate 64000, channel count 1; saves to `{filesDir}/notes/{uuid}.m4a`
+- `composeApp/src/main/.../AndroidAudioRecorder.kt` (`actual`) — uses `android.media.MediaRecorder`; output format `MPEG_4`, audio encoder `AAC`, bit rate 64000, channel count 1; saves to `{filesDir}/notes/{uuid}.m4a`
 
 **Tests to propose**:
 - Android instrumented: call `start()`, wait 2 seconds, call `stop()` → verify returned file path exists, file size > 0
@@ -208,8 +208,8 @@ Each task entry:
 
 **Scope**:
 - `shared/src/commonMain/kotlin/.../di/SharedModule.kt` — Koin `module { }` for: `TripLensDatabase`, all repositories, `ExportUseCase` (stub for now), `TransportClassifier`
-- `androidApp/src/main/java/.../di/AndroidModule.kt` — Koin `module { }` for: `AndroidLocationProvider`, `AndroidGalleryScanner`, `AndroidAudioRecorder`
-- `androidApp/src/main/java/.../TripLensApplication.kt` — `Application` subclass, calls `startKoin { modules(sharedModule, androidModule) }`
+- `composeApp/src/main/java/.../di/AndroidModule.kt` — Koin `module { }` for: `AndroidLocationProvider`, `AndroidGalleryScanner`, `AndroidAudioRecorder`
+- `composeApp/src/main/java/.../TripLensApplication.kt` — `Application` subclass, calls `startKoin { modules(sharedModule, androidModule) }`
 - `AndroidManifest.xml` — `android:name=".TripLensApplication"`
 
 **Tests to propose**:
@@ -253,9 +253,9 @@ Each task entry:
 **Depends on**: Task 9
 
 **Scope**:
-- `androidApp/src/main/java/.../MainActivity.kt` — hosts `NavHost`
-- `androidApp/src/main/java/.../navigation/AppNavGraph.kt` — routes: `tripList`, `recording`, `settings`, `tripDetail/{groupId}`, `sessionReview/{sessionId}`
-- `androidApp/src/main/java/.../navigation/BottomNavBar.kt` — shows on top-level destinations only; "Recording" tab highlighted/pulsing when a session is active
+- `composeApp/src/main/java/.../MainActivity.kt` — hosts `NavHost`
+- `composeApp/src/main/java/.../navigation/AppNavGraph.kt` — routes: `tripList`, `recording`, `settings`, `tripDetail/{groupId}`, `sessionReview/{sessionId}`
+- `composeApp/src/main/java/.../navigation/BottomNavBar.kt` — shows on top-level destinations only; "Recording" tab highlighted/pulsing when a session is active
 - Dynamic start: on app open, query `SessionRepository.getActiveSession()` → if non-null → start at `recording`, else → start at `tripList`
 - Stub composable screens (empty `Box`) for each route so the nav graph compiles
 
@@ -275,10 +275,10 @@ Each task entry:
 **Depends on**: Tasks 4, 11
 
 **Scope**:
-- `androidApp/src/main/java/.../ui/recording/RecordingViewModel.kt` — idle state machine: `Idle`, `RequestingPermissions`, `SelectingGroup`, `CreatingGroup`, `StartingSession`
-- `androidApp/src/main/java/.../ui/recording/RecordingScreen.kt` — idle state UI: large circular "Start Recording" button, gear icon
-- `androidApp/src/main/java/.../ui/recording/PermissionRationaleDialog.kt` — explains why "Always Allow" is required for background location; includes "Open Settings" button for permanently denied case
-- `androidApp/src/main/java/.../ui/recording/GroupSelectorDialog.kt` — lists existing TripGroups + "Create New Trip" option; on creation: default name `"YYYY-MM-DD"` (city appended later via reverse geocode)
+- `composeApp/src/main/java/.../ui/recording/RecordingViewModel.kt` — idle state machine: `Idle`, `RequestingPermissions`, `SelectingGroup`, `CreatingGroup`, `StartingSession`
+- `composeApp/src/main/java/.../ui/recording/RecordingScreen.kt` — idle state UI: large circular "Start Recording" button, gear icon
+- `composeApp/src/main/java/.../ui/recording/PermissionRationaleDialog.kt` — explains why "Always Allow" is required for background location; includes "Open Settings" button for permanently denied case
+- `composeApp/src/main/java/.../ui/recording/GroupSelectorDialog.kt` — lists existing TripGroups + "Create New Trip" option; on creation: default name `"YYYY-MM-DD"` (city appended later via reverse geocode)
 - Permission checks: `ACCESS_FINE_LOCATION` (required), `ACCESS_BACKGROUND_LOCATION` (required, separate rationale), `RECORD_AUDIO` (required for voice notes), `READ_MEDIA_IMAGES` + `ACCESS_MEDIA_LOCATION` (required for gallery scan)
 
 **Tests to propose**:
@@ -327,11 +327,11 @@ Each task entry:
 **Depends on**: Tasks 4, 11
 
 **Scope**:
-- `androidApp/src/main/java/.../ui/triplist/TripListViewModel.kt` — loads all TripGroups with aggregated stats (session count, total distance, total duration, photo/video/note counts)
-- `androidApp/src/main/java/.../ui/triplist/TripListScreen.kt` — sorted list of TripGroup cards; each card: name (inline rename on tap), date range, stats summary, trajectory thumbnail (static mini-map via MapLibre snapshot or simple Canvas polyline), photo/video/note icon counts
+- `composeApp/src/main/java/.../ui/triplist/TripListViewModel.kt` — loads all TripGroups with aggregated stats (session count, total distance, total duration, photo/video/note counts)
+- `composeApp/src/main/java/.../ui/triplist/TripListScreen.kt` — sorted list of TripGroup cards; each card: name (inline rename on tap), date range, stats summary, trajectory thumbnail (static mini-map via MapLibre snapshot or simple Canvas polyline), photo/video/note icon counts
 - Long-press / swipe actions on TripGroup card: Rename (inline), Delete (confirmation dialog), Export (triggers `ExportUseCase`)
-- `androidApp/src/main/java/.../ui/tripdetail/TripDetailViewModel.kt` — loads sessions for a group with transport mode breakdown per session
-- `androidApp/src/main/java/.../ui/tripdetail/TripDetailScreen.kt` — header with group stats; session list: each session shows name (editable), date+time range, duration+distance, transport breakdown icons (e.g. "🚶 2.3km 🚗 45km"); Export FAB
+- `composeApp/src/main/java/.../ui/tripdetail/TripDetailViewModel.kt` — loads sessions for a group with transport mode breakdown per session
+- `composeApp/src/main/java/.../ui/tripdetail/TripDetailScreen.kt` — header with group stats; session list: each session shows name (editable), date+time range, duration+distance, transport breakdown icons (e.g. "🚶 2.3km 🚗 45km"); Export FAB
 
 **Tests to propose**:
 - `TripListViewModel`: empty DB → `groups` state is empty list
@@ -349,8 +349,8 @@ Each task entry:
 **Depends on**: Tasks 5, 13
 
 **Scope**:
-- `androidApp/src/main/java/.../ui/sessionreview/SessionReviewViewModel.kt` — loads session, TrackPoints (with `SegmentSmoother` applied), MediaReferences, Notes; computes stats (distance, duration, transport breakdown)
-- `androidApp/src/main/java/.../ui/sessionreview/SessionReviewScreen.kt`:
+- `composeApp/src/main/java/.../ui/sessionreview/SessionReviewViewModel.kt` — loads session, TrackPoints (with `SegmentSmoother` applied), MediaReferences, Notes; computes stats (distance, duration, transport breakdown)
+- `composeApp/src/main/java/.../ui/sessionreview/SessionReviewScreen.kt`:
   - Map area (~50% height): full trajectory polyline (same color scheme as recording screen), media markers; tapping a marker scrolls the timeline to that item
   - Timeline (scrollable, ~50% height): chronological list of events — transport segment cards ("🚶 Walking — 1.2 km, 18 min"), photo thumbnails (tapping opens full-screen photo viewer), voice note items (tapping plays audio), text note items
 - `MediaPreviewSheet.kt` — full-screen photo viewer (pinch-to-zoom via Coil), voice note playback (Android `MediaPlayer`), text note display
@@ -370,9 +370,9 @@ Each task entry:
 **Depends on**: Task 11
 
 **Scope**:
-- `androidApp/src/main/java/.../data/AppPreferences.kt` — DataStore wrapper with typed accessors for: `language` (SYSTEM / EN / ZH_CN), `accuracyProfile` (STANDARD / HIGH / BATTERY_SAVER), `scanIntervalSeconds` (30 / 60 / 120)
-- `androidApp/src/main/java/.../ui/settings/SettingsViewModel.kt` — reads/writes `AppPreferences`
-- `androidApp/src/main/java/.../ui/settings/SettingsScreen.kt` — three preference sections, each a row with a label and a chip group or dropdown
+- `composeApp/src/main/java/.../data/AppPreferences.kt` — DataStore wrapper with typed accessors for: `language` (SYSTEM / EN / ZH_CN), `accuracyProfile` (STANDARD / HIGH / BATTERY_SAVER), `scanIntervalSeconds` (30 / 60 / 120)
+- `composeApp/src/main/java/.../ui/settings/SettingsViewModel.kt` — reads/writes `AppPreferences`
+- `composeApp/src/main/java/.../ui/settings/SettingsScreen.kt` — three preference sections, each a row with a label and a chip group or dropdown
 - Language change applies immediately via `AppCompatDelegate.setApplicationLocales()` (Android 13+) / AndroidX compat for older versions
 
 **Tests to propose**:
@@ -392,8 +392,8 @@ Each task entry:
 **Depends on**: Task 16
 
 **Scope**:
-- `androidApp/src/main/res/values/strings.xml` — all English UI strings
-- `androidApp/src/main/res/values-zh-rCN/strings.xml` — all Simplified Chinese translations
+- `composeApp/src/main/res/values/strings.xml` — all English UI strings
+- `composeApp/src/main/res/values-zh-rCN/strings.xml` — all Simplified Chinese translations
 - `shared/src/commonMain/kotlin/.../i18n/Strings.kt` — `expect object Strings` with keys for: `defaultTripNameFormat`, `sessionDefaultName`, `exportReadmeContent`, `gpxCreatorTag`
 - `shared/src/androidMain/kotlin/.../i18n/Strings.kt` — `actual object Strings` backed by `context.getString(R.string.*)`
 - Language application: in `TripLensApplication.onCreate()` read language preference and call `AppCompatDelegate.setApplicationLocales()`
@@ -412,7 +412,7 @@ Each task entry:
 **Depends on**: Tasks 4, 10, 12
 
 **Scope**:
-- `androidApp/src/main/java/.../ui/MainActivity.kt` (or `AppViewModel.kt`) — on startup: (1) run `TripLensDatabase.integrityCheck()` — if it fails, rename DB to `.corrupt` and create fresh; (2) check for any session with `status = "recording"` and no running `LocationTrackingService` → if found, show recovery dialog
+- `composeApp/src/main/java/.../ui/MainActivity.kt` (or `AppViewModel.kt`) — on startup: (1) run `TripLensDatabase.integrityCheck()` — if it fails, rename DB to `.corrupt` and create fresh; (2) check for any session with `status = "recording"` and no running `LocationTrackingService` → if found, show recovery dialog
 - `SessionRecoveryDialog.kt` — "Your last recording was interrupted. Resume or discard?" — Resume: create new Session in same TripGroup, start service; Discard: set status to `interrupted`
 - `ExportUseCase.kt` — wrap the zip step in try/catch; on failure: delete temp dir, rethrow with a descriptive message; the caller (ViewModel) shows an error snackbar
 - DB integrity check path: `TripLensDatabase.kt` — add `fun integrityCheck(): Boolean` using `PRAGMA integrity_check`
@@ -436,7 +436,7 @@ Each task entry:
 **Depends on**: Tasks 10, 14
 
 **Scope**:
-- `androidApp/src/main/res/xml/file_provider_paths.xml` — declares the app's `files-path` for `FileProvider`
+- `composeApp/src/main/res/xml/file_provider_paths.xml` — declares the app's `files-path` for `FileProvider`
 - `AndroidManifest.xml` — `<provider>` declaration for `androidx.core.content.FileProvider`
 - `TripDetailViewModel.kt` + `TripListViewModel.kt` — `onExport(groupId)` → launches coroutine → calls `ExportUseCase.export()` → on success: create `FileProvider` URI → trigger `ACTION_SEND` intent → expose `ExportState` (Idle / InProgress / Done / Error) to UI
 - `TripDetailScreen.kt` / `TripListScreen.kt` — show a `LinearProgressIndicator` (indeterminate) while export is in progress; show error snackbar on failure

@@ -1,6 +1,6 @@
 # TripLens Phase 0 + Phase 1: KMP Scaffold & Data Layer Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Create a compiling KMP project and implement the full data layer — models, SQLDelight schema, repositories, transport classifier, and segment smoother — all with passing unit tests.
 
@@ -24,12 +24,12 @@ All source files use package prefix `com.triplens`. Paths below use `…` for `s
 - `build.gradle.kts` (root)
 - `gradle/libs.versions.toml`
 - `shared/build.gradle.kts`
-- `androidApp/build.gradle.kts`
-- `androidApp/src/main/AndroidManifest.xml`
-- `androidApp/src/main/java/com/triplens/android/MainActivity.kt`
+- `composeApp/build.gradle.kts`
+- `composeApp/src/main/AndroidManifest.xml`
+- `composeApp/src/main/java/com/triplens/android/MainActivity.kt`
 - `settings.gradle.kts`
 
-- [ ] **Step 1: Generate project via KMP Wizard**
+- [x] **Step 1: Generate project via KMP Wizard**
 
   In Android Studio: **File → New → New Project → Kotlin Multiplatform App**.
   - Application name: `TripLens`
@@ -40,7 +40,7 @@ All source files use package prefix `com.triplens`. Paths below use `…` for `s
 
   If the wizard isn't available, use [kmp.jetbrains.com](https://kmp.jetbrains.com) to generate, download, and unzip into the repo directory.
 
-- [ ] **Step 2: Replace `gradle/libs.versions.toml` with the pinned version catalog**
+- [x] **Step 2: Replace `gradle/libs.versions.toml` with the pinned version catalog**
 
   Replace the entire file with:
 
@@ -96,7 +96,7 @@ All source files use package prefix `com.triplens`. Paths below use `…` for `s
   android-library = { id = "com.android.library", version = "8.7.3" }
   ```
 
-- [ ] **Step 3: Replace root `build.gradle.kts`**
+- [x] **Step 3: Replace root `build.gradle.kts`**
 
   ```kotlin
   plugins {
@@ -110,7 +110,7 @@ All source files use package prefix `com.triplens`. Paths below use `…` for `s
   }
   ```
 
-- [ ] **Step 4: Replace `shared/build.gradle.kts`**
+- [x] **Step 4: Replace `shared/build.gradle.kts`**
 
   ```kotlin
   plugins {
@@ -165,7 +165,7 @@ All source files use package prefix `com.triplens`. Paths below use `…` for `s
   }
   ```
 
-- [ ] **Step 5: Replace `androidApp/build.gradle.kts`**
+- [x] **Step 5: Replace `composeApp/build.gradle.kts`**
 
   ```kotlin
   plugins {
@@ -211,7 +211,7 @@ All source files use package prefix `com.triplens`. Paths below use `…` for `s
   }
   ```
 
-- [ ] **Step 6: Update `AndroidManifest.xml` with all permissions**
+- [x] **Step 6: Update `AndroidManifest.xml` with all permissions**
 
   Replace `<manifest>` contents (inside the existing manifest, before `<application>`):
 
@@ -227,14 +227,14 @@ All source files use package prefix `com.triplens`. Paths below use `…` for `s
   <uses-permission android:name="android.permission.ACCESS_MEDIA_LOCATION" />
   ```
 
-- [ ] **Step 7: Gradle sync and verify**
+- [x] **Step 7: Gradle sync and verify**
 
   In Android Studio: **File → Sync Project with Gradle Files**
   Expected: BUILD SUCCESSFUL, no red underlines.
 
   Run empty app on emulator. Expected: blank screen, no crash.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
   ```bash
   git add -A
@@ -260,7 +260,7 @@ All source files use package prefix `com.triplens`. Paths below use `…` for `s
 
 ### Step-by-step
 
-- [ ] **Step 1: Write the serialization test first**
+- [x] **Step 1: Write the serialization test first**
 
   Create `shared/src/commonTest/kotlin/com/triplens/model/ModelSerializationTest.kt`:
 
@@ -378,11 +378,11 @@ All source files use package prefix `com.triplens`. Paths below use `…` for `s
   }
   ```
 
-- [ ] **Step 2: Run test to confirm it fails (models don't exist yet)**
+- [x] **Step 2: Run test to confirm it fails (models don't exist yet)**
 
   In Android Studio: right-click `ModelSerializationTest.kt` → Run. Expected: compilation errors about missing types.
 
-- [ ] **Step 3: Create enum files**
+- [x] **Step 3: Create enum files**
 
   `shared/src/commonMain/kotlin/com/triplens/model/TransportMode.kt`:
   ```kotlin
@@ -474,7 +474,7 @@ All source files use package prefix `com.triplens`. Paths below use `…` for `s
   }
   ```
 
-- [ ] **Step 4: Create data class files**
+- [x] **Step 4: Create data class files**
 
   `shared/src/commonMain/kotlin/com/triplens/model/TripGroup.kt`:
   ```kotlin
@@ -574,11 +574,11 @@ All source files use package prefix `com.triplens`. Paths below use `…` for `s
   )
   ```
 
-- [ ] **Step 5: Run tests — confirm all pass**
+- [x] **Step 5: Run tests — confirm all pass**
 
   In Android Studio: right-click `ModelSerializationTest.kt` → Run. Expected: 7 tests pass.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
   ```bash
   git add shared/src/commonMain/kotlin/com/triplens/model/ \
@@ -604,7 +604,7 @@ All source files use package prefix `com.triplens`. Paths below use `…` for `s
 
 ### Step-by-step
 
-- [ ] **Step 1: Write failing schema tests**
+- [x] **Step 1: Write failing schema tests**
 
   Create `shared/src/commonTest/kotlin/com/triplens/db/DatabaseSchemaTest.kt`:
 
@@ -717,9 +717,9 @@ All source files use package prefix `com.triplens`. Paths below use `…` for `s
   }
   ```
 
-- [ ] **Step 2: Run test — confirm compilation errors (no DB files yet)**
+- [x] **Step 2: Run test — confirm compilation errors (no DB files yet)**
 
-- [ ] **Step 3: Create SQLDelight `.sq` schema file**
+- [x] **Step 3: Create SQLDelight `.sq` schema file**
 
   Create `shared/src/commonMain/sqldelight/com/triplens/db/schema.sq`:
 
@@ -792,7 +792,7 @@ All source files use package prefix `com.triplens`. Paths below use `…` for `s
   CREATE INDEX idx_note_session ON note(session_id);
   ```
 
-- [ ] **Step 4: Create query files**
+- [x] **Step 4: Create query files**
 
   Create `shared/src/commonMain/sqldelight/com/triplens/db/TripGroupQueries.sq`:
   ```sql
@@ -893,7 +893,7 @@ All source files use package prefix `com.triplens`. Paths below use `…` for `s
   DELETE FROM note WHERE id = ?;
   ```
 
-- [ ] **Step 5: Create `expect` DatabaseDriverFactory**
+- [x] **Step 5: Create `expect` DatabaseDriverFactory**
 
   Create `shared/src/commonMain/kotlin/com/triplens/db/DatabaseDriverFactory.kt`:
   ```kotlin
@@ -908,7 +908,7 @@ All source files use package prefix `com.triplens`. Paths below use `…` for `s
   }
   ```
 
-- [ ] **Step 6: Create Android `actual` DatabaseDriverFactory**
+- [x] **Step 6: Create Android `actual` DatabaseDriverFactory**
 
   Create `shared/src/androidMain/kotlin/com/triplens/db/DatabaseDriverFactory.kt`:
   ```kotlin
@@ -924,7 +924,7 @@ All source files use package prefix `com.triplens`. Paths below use `…` for `s
   }
   ```
 
-- [ ] **Step 7: Create `TripLensDatabase` wrapper**
+- [x] **Step 7: Create `TripLensDatabase` wrapper**
 
   Create `shared/src/commonMain/kotlin/com/triplens/db/TripLensDatabase.kt`:
   ```kotlin
@@ -973,11 +973,11 @@ All source files use package prefix `com.triplens`. Paths below use `…` for `s
 
   > Note: the `TripLensDatabase` wrapper and the SQLDelight-generated `TripLensDatabase` share a name. The import alias `as GeneratedDb` resolves this.
 
-- [ ] **Step 8: Gradle sync, then run `DatabaseSchemaTest`**
+- [x] **Step 8: Gradle sync, then run `DatabaseSchemaTest`**
 
   Expected: all 8 tests pass.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
   ```bash
   git add shared/src/commonMain/sqldelight/ \
@@ -1001,7 +1001,7 @@ All source files use package prefix `com.triplens`. Paths below use `…` for `s
 
 ### Step-by-step
 
-- [ ] **Step 1: Write failing repository tests**
+- [x] **Step 1: Write failing repository tests**
 
   Create `shared/src/commonTest/kotlin/com/triplens/repository/RepositoryTest.kt`:
 
@@ -1166,9 +1166,9 @@ All source files use package prefix `com.triplens`. Paths below use `…` for `s
   }
   ```
 
-- [ ] **Step 2: Run test — confirm compilation errors (no repos yet)**
+- [x] **Step 2: Run test — confirm compilation errors (no repos yet)**
 
-- [ ] **Step 3: Create `TrackPointInsert` value class**
+- [x] **Step 3: Create `TrackPointInsert` value class**
 
   Create `shared/src/commonMain/kotlin/com/triplens/repository/TrackPointInsert.kt`:
   ```kotlin
@@ -1189,7 +1189,7 @@ All source files use package prefix `com.triplens`. Paths below use `…` for `s
   )
   ```
 
-- [ ] **Step 4: Create repository files**
+- [x] **Step 4: Create repository files**
 
   Create `shared/src/commonMain/kotlin/com/triplens/repository/TripRepository.kt`:
   ```kotlin
@@ -1420,11 +1420,11 @@ All source files use package prefix `com.triplens`. Paths below use `…` for `s
   }
   ```
 
-- [ ] **Step 5: Run `RepositoryTest` — confirm all pass**
+- [x] **Step 5: Run `RepositoryTest` — confirm all pass**
 
   Expected: 8 tests pass.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
   ```bash
   git add shared/src/commonMain/kotlin/com/triplens/repository/ \
@@ -1445,7 +1445,7 @@ All source files use package prefix `com.triplens`. Paths below use `…` for `s
 
 ### Step-by-step
 
-- [ ] **Step 1: Write failing `TransportClassifierTest`**
+- [x] **Step 1: Write failing `TransportClassifierTest`**
 
   Create `shared/src/commonTest/kotlin/com/triplens/domain/TransportClassifierTest.kt`:
 
@@ -1492,9 +1492,9 @@ All source files use package prefix `com.triplens`. Paths below use `…` for `s
   }
   ```
 
-- [ ] **Step 2: Run test — confirm compilation errors**
+- [x] **Step 2: Run test — confirm compilation errors**
 
-- [ ] **Step 3: Implement `TransportClassifier`**
+- [x] **Step 3: Implement `TransportClassifier`**
 
   Create `shared/src/commonMain/kotlin/com/triplens/domain/TransportClassifier.kt`:
 
@@ -1532,9 +1532,9 @@ All source files use package prefix `com.triplens`. Paths below use `…` for `s
   }
   ```
 
-- [ ] **Step 4: Run `TransportClassifierTest` — all 16 tests pass**
+- [x] **Step 4: Run `TransportClassifierTest` — all 16 tests pass**
 
-- [ ] **Step 5: Write failing `SegmentSmootherTest`**
+- [x] **Step 5: Write failing `SegmentSmootherTest`**
 
   Create `shared/src/commonTest/kotlin/com/triplens/domain/SegmentSmootherTest.kt`:
 
@@ -1660,9 +1660,9 @@ All source files use package prefix `com.triplens`. Paths below use `…` for `s
   }
   ```
 
-- [ ] **Step 6: Run test — confirm compilation errors (no Segment/SegmentSmoother yet)**
+- [x] **Step 6: Run test — confirm compilation errors (no Segment/SegmentSmoother yet)**
 
-- [ ] **Step 7: Create `Segment` data class**
+- [x] **Step 7: Create `Segment` data class**
 
   Create `shared/src/commonMain/kotlin/com/triplens/domain/Segment.kt`:
   ```kotlin
@@ -1688,7 +1688,7 @@ All source files use package prefix `com.triplens`. Paths below use `…` for `s
   )
   ```
 
-- [ ] **Step 8: Implement `SegmentSmoother`**
+- [x] **Step 8: Implement `SegmentSmoother`**
 
   Create `shared/src/commonMain/kotlin/com/triplens/domain/SegmentSmoother.kt`:
 
@@ -1804,9 +1804,9 @@ All source files use package prefix `com.triplens`. Paths below use `…` for `s
   }
   ```
 
-- [ ] **Step 9: Run `SegmentSmootherTest` — all 8 tests pass**
+- [x] **Step 9: Run `SegmentSmootherTest` — all 8 tests pass**
 
-- [ ] **Step 10: Commit**
+- [x] **Step 10: Commit**
 
   ```bash
   git add shared/src/commonMain/kotlin/com/triplens/domain/ \

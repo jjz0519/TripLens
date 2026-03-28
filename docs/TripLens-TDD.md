@@ -54,7 +54,7 @@ triplens/
 │   ├── src/commonMain/              # Pure Kotlin: models, DB, algorithms, export
 │   ├── src/androidMain/             # Android expect/actual: MediaStore, ForegroundService
 │   └── src/iosMain/                 # (Future) iOS expect/actual: CoreLocation, PhotoKit
-├── androidApp/                      # Android app entry point + Compose UI
+├── composeApp/                      # Android app entry point + Compose UI
 │   ├── src/main/
 │   │   ├── java/.../
 │   │   │   ├── ui/                  # Compose screens
@@ -178,7 +178,7 @@ val sharedModule = module {
     single { TransportClassifier() }
 }
 
-// androidApp - androidModule
+// composeApp - androidModule
 val androidModule = module {
     single<LocationProvider> { AndroidLocationProvider(get()) }
     single<GalleryScanner> { AndroidGalleryScanner(get()) }
