@@ -1,5 +1,6 @@
 package com.cooldog.triplens.db
 
+import app.cash.sqldelight.db.QueryResult
 import app.cash.sqldelight.db.SqlDriver
 
 // Wraps the SQLDelight-generated TripLensDatabase interface.
@@ -22,9 +23,15 @@ class AppDatabase(private val driver: SqlDriver) {
     val noteQueries       get() = db.noteQueriesQueries
 
     init {
-        // WAL mode improves read concurrency during active GPS recording
-        driver.execute(null, "PRAGMA journal_mode=WAL", 0)
-        // Foreign key support is off by default in SQLite
+        // PRAGMA journal_mode=WAL returns the active journal mode as a result row.
+        // Android's driver routes execute() through executeUpdateDelete() which rejects
+        // any statement that returns a cursor, so we must use executeQuery here.
+        // The JVM JDBC driver handles executeQuery correctly for result-returning PRAGMAs.
+        driver.executeQuery(null, "PRAGMA journal_mode=WAL", { QueryResult.Unit }, 0)
+
+        // PRAGMA foreign_keys=ON does NOT return a result row on the JVM JDBC driver
+        // (it throws "Query does not return results" if called via executeQuery there).
+        // Android's driver accepts execute() for PRAGMAs that produce no cursor.
         driver.execute(null, "PRAGMA foreign_keys=ON", 0)
     }
 

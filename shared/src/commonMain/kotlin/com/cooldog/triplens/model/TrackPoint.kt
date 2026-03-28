@@ -12,5 +12,7 @@ data class TrackPoint(
     val altitude: Double?,       // null if GPS has no altitude fix
     val accuracy: Float,         // metres, horizontal accuracy radius
     val speed: Float?,           // m/s, null if not provided by GPS
-    val transportMode: TransportMode
+    val transportMode: TransportMode,
+    // True during auto-pause intervals (>3h stationary). These points are hidden from timeline.
+    val isAutoPaused: Boolean
 )

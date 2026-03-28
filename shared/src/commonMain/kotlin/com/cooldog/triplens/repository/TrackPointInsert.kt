@@ -11,5 +11,7 @@ data class TrackPointInsert(
     val altitude: Double?,
     val accuracy: Float,
     val speed: Float?,
-    val transportMode: TransportMode
+    val transportMode: TransportMode,
+    // Defaults to false; set to true only by LocationTrackingService during auto-pause.
+    val isAutoPaused: Boolean = false
 )

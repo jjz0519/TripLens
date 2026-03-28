@@ -48,7 +48,8 @@ class ModelSerializationTest {
             altitude = null,
             accuracy = 8.5f,
             speed = null,
-            transportMode = TransportMode.WALKING
+            transportMode = TransportMode.WALKING,
+            isAutoPaused = false
         )
         val encoded = json.encodeToString(point)
         assertEquals(point, json.decodeFromString(encoded))

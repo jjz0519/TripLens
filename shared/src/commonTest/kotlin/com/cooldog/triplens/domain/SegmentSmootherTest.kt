@@ -20,7 +20,8 @@ class SegmentSmootherTest {
                 altitude = null,
                 accuracy = 8f,
                 speed = null,
-                transportMode = mode
+                transportMode = mode,
+                isAutoPaused = false
             )
         }
 

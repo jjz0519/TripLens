@@ -55,7 +55,7 @@ class DatabaseSchemaTest {
     fun trackPoint_insertAndQuery_nullableAltitude() {
         db.tripGroupQueries.insert("g1", "Trip", 1_000L, 1_000L)
         db.sessionQueries.insert("s1", "g1", "Day 1", 2_000L, null, "recording")
-        db.trackPointQueries.insert("s1", 3_000L, -41.28, 174.77, null, 8.5, null, "walking")
+        db.trackPointQueries.insert("s1", 3_000L, -41.28, 174.77, null, 8.5, null, "walking", 0L)
         val points = db.trackPointQueries.getBySessionId("s1").executeAsList()
         assertEquals(1, points.size)
         assertNull(points[0].altitude)
@@ -67,7 +67,7 @@ class DatabaseSchemaTest {
         db.tripGroupQueries.insert("g1", "Trip", 1_000L, 1_000L)
         db.sessionQueries.insert("s1", "g1", "Day 1", 2_000L, null, "recording")
         assertFailsWith<Exception> {
-            db.trackPointQueries.insert("s1", 3_000L, -41.28, 174.77, null, 8.5, null, "WALKING")
+            db.trackPointQueries.insert("s1", 3_000L, -41.28, 174.77, null, 8.5, null, "WALKING", 0L)
         }
     }
 
@@ -75,7 +75,7 @@ class DatabaseSchemaTest {
     fun session_delete_cascadesToTrackPoints() {
         db.tripGroupQueries.insert("g1", "Trip", 1_000L, 1_000L)
         db.sessionQueries.insert("s1", "g1", "Day 1", 2_000L, null, "recording")
-        db.trackPointQueries.insert("s1", 3_000L, -41.28, 174.77, null, 8.5, null, "walking")
+        db.trackPointQueries.insert("s1", 3_000L, -41.28, 174.77, null, 8.5, null, "walking", 0L)
         db.noteQueries.insert("n1", "s1", "text", "Hello", null, null, 3_500L, -41.28, 174.77)
 
         db.sessionQueries.delete("s1")

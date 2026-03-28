@@ -136,7 +136,7 @@ Each task entry:
 
 ## Phase 2 — Platform Services (androidMain)
 
-### Task 6: LocationTrackingService (ForegroundService)
+### Task 6: LocationTrackingService (ForegroundService) ✓ DONE
 
 **Goal**: Implement the Android ForegroundService that owns the GPS recording lifecycle, including dynamic interval switching, START_STICKY recovery, and session persistence to SharedPreferences.
 
@@ -458,7 +458,7 @@ Each task entry:
 | 3 | SQLDelight Schema | Data | DB schema + generated queries |
 | 4 | Repository Layer | Data | Suspending repository APIs |
 | 5 | TransportClassifier + Smoother | Data | Algorithms, fully unit-tested |
-| 6 | LocationTrackingService | Platform | ForegroundService + recovery |
+| 6 | LocationTrackingService | Platform | ForegroundService + recovery | ✓ |
 | 7 | GalleryScanner | Platform | MediaStore integration |
 | 8 | AudioRecorder | Platform | M4A voice note recording |
 | 9 | Koin DI Setup | Domain | Full DI graph wired |

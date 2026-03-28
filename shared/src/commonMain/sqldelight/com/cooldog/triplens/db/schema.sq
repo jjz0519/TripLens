@@ -28,7 +28,9 @@ CREATE TABLE track_point (
     accuracy       REAL    NOT NULL,
     speed          REAL,
     transport_mode TEXT    NOT NULL DEFAULT 'stationary'
-        CHECK (transport_mode IN ('stationary','walking','cycling','driving','fast_transit'))
+        CHECK (transport_mode IN ('stationary','walking','cycling','driving','fast_transit')),
+    -- True during auto-pause intervals (3h+ stationary). Hidden from timeline display.
+    is_auto_paused INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX idx_tp_session_time ON track_point(session_id, timestamp);
 

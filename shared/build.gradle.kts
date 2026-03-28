@@ -26,6 +26,8 @@ kotlin {
         androidMain.dependencies {
             implementation(libs.sqldelight.android.driver)
             implementation(libs.kotlinx.coroutines.android)
+            // Required for LocationProvider actual (FusedLocationProviderClient)
+            implementation(libs.play.services.location)
         }
     }
 }

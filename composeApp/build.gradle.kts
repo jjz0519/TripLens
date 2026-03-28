@@ -37,6 +37,13 @@ kotlin {
         commonTest.dependencies {
             implementation(kotlin("test"))
         }
+        androidInstrumentedTest.dependencies {
+            implementation(libs.androidx.test.junit)
+            implementation(libs.androidx.test.runner)
+            implementation(libs.androidx.test.rules)
+            implementation(libs.androidx.test.core)
+            implementation(libs.kotlinx.coroutines.test)
+        }
     }
 }
 
@@ -55,6 +62,7 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     packaging {
         resources {

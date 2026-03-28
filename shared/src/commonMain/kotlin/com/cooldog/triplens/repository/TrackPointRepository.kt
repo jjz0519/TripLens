@@ -11,7 +11,9 @@ class TrackPointRepository(private val db: AppDatabase) {
             point.sessionId, point.timestamp,
             point.latitude, point.longitude, point.altitude,
             point.accuracy.toDouble(), point.speed?.toDouble(),
-            point.transportMode.name.lowercase()
+            point.transportMode.name.lowercase(),
+            // SQLite stores booleans as integers (1/0)
+            if (point.isAutoPaused) 1L else 0L
         )
     }
 
@@ -38,6 +40,7 @@ class TrackPointRepository(private val db: AppDatabase) {
         altitude = altitude,
         accuracy = accuracy.toFloat(),
         speed = speed?.toFloat(),
-        transportMode = TransportMode.valueOf(transport_mode.uppercase())
+        transportMode = TransportMode.valueOf(transport_mode.uppercase()),
+        isAutoPaused = is_auto_paused != 0L
     )
 }

@@ -1,6 +1,6 @@
 insert:
-INSERT INTO track_point(session_id, timestamp, latitude, longitude, altitude, accuracy, speed, transport_mode)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+INSERT INTO track_point(session_id, timestamp, latitude, longitude, altitude, accuracy, speed, transport_mode, is_auto_paused)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 getBySessionId:
 SELECT * FROM track_point WHERE session_id = ? ORDER BY timestamp ASC;
