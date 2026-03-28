@@ -1,12 +1,12 @@
 package com.cooldog.triplens.repository
 
-import com.cooldog.triplens.db.TripLensDatabase
+import com.cooldog.triplens.db.AppDatabase
 import com.cooldog.triplens.model.LocationSource
 import com.cooldog.triplens.model.MediaReference
 import com.cooldog.triplens.model.MediaSource
 import com.cooldog.triplens.model.MediaType
 
-class MediaRefRepository(private val db: TripLensDatabase) {
+class MediaRefRepository(private val db: AppDatabase) {
 
     /**
      * Inserts a media reference only if no row with the same content_uri already exists.

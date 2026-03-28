@@ -61,8 +61,20 @@ object SegmentSmoother {
             smoothed.addAll(result)
         }
 
+        // Step 2b: merge adjacent groups that share the same mode after absorption.
+        // Absorption can leave two consecutive groups with identical modes when a
+        // noise segment between them is collapsed into its left neighbor.
+        val merged = mutableListOf<Pair<TransportMode, MutableList<TrackPoint>>>()
+        for ((mode, pts) in smoothed) {
+            if (merged.isNotEmpty() && merged.last().first == mode) {
+                merged.last().second.addAll(pts)
+            } else {
+                merged.add(mode to pts.toMutableList())
+            }
+        }
+
         // Step 3: build Segment objects
-        return smoothed.map { (mode, pts) ->
+        return merged.map { (mode, pts) ->
             val first = pts.first()
             val last = pts.last()
             val distance = computeDistance(pts)

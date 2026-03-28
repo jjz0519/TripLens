@@ -1,7 +1,7 @@
 package com.cooldog.triplens.repository
 
 import app.cash.sqldelight.driver.jdbc.sqlite.JdbcSqliteDriver
-import com.cooldog.triplens.db.TripLensDatabase
+import com.cooldog.triplens.db.AppDatabase
 import com.cooldog.triplens.model.NoteType
 import com.cooldog.triplens.model.SessionStatus
 import com.cooldog.triplens.model.TransportMode
@@ -15,7 +15,7 @@ import kotlin.test.assertTrue
 
 class RepositoryTest {
 
-    private lateinit var db: TripLensDatabase
+    private lateinit var db: AppDatabase
     private lateinit var tripRepo: TripRepository
     private lateinit var sessionRepo: SessionRepository
     private lateinit var trackPointRepo: TrackPointRepository
@@ -25,8 +25,8 @@ class RepositoryTest {
     @BeforeTest
     fun setup() {
         val driver = JdbcSqliteDriver(JdbcSqliteDriver.IN_MEMORY)
-        TripLensDatabase.Schema.create(driver)
-        db = TripLensDatabase(driver)
+        AppDatabase.Schema.create(driver)
+        db = AppDatabase(driver)
         tripRepo = TripRepository(db)
         sessionRepo = SessionRepository(db)
         trackPointRepo = TrackPointRepository(db)

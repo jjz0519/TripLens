@@ -1,10 +1,10 @@
 package com.cooldog.triplens.repository
 
-import com.cooldog.triplens.db.TripLensDatabase
+import com.cooldog.triplens.db.AppDatabase
 import com.cooldog.triplens.model.Session
 import com.cooldog.triplens.model.SessionStatus
 
-class SessionRepository(private val db: TripLensDatabase) {
+class SessionRepository(private val db: AppDatabase) {
 
     fun createSession(id: String, groupId: String, name: String, startTime: Long) {
         db.sessionQueries.insert(id, groupId, name, startTime, null, "recording")

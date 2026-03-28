@@ -1,10 +1,10 @@
 package com.cooldog.triplens.repository
 
-import com.cooldog.triplens.db.TripLensDatabase
+import com.cooldog.triplens.db.AppDatabase
 import com.cooldog.triplens.model.Note
 import com.cooldog.triplens.model.NoteType
 
-class NoteRepository(private val db: TripLensDatabase) {
+class NoteRepository(private val db: AppDatabase) {
 
     fun createTextNote(
         id: String, sessionId: String, content: String,

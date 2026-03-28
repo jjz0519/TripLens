@@ -13,14 +13,14 @@ import kotlin.test.assertTrue
 class DatabaseSchemaTest {
 
     private lateinit var driver: SqlDriver
-    private lateinit var db: TripLensDatabase
+    private lateinit var db: AppDatabase
 
     @BeforeTest
     fun setup() {
         // In-memory SQLite — no Android emulator required
         driver = JdbcSqliteDriver(JdbcSqliteDriver.IN_MEMORY)
-        TripLensDatabase.Schema.create(driver)
-        db = TripLensDatabase(driver)
+        AppDatabase.Schema.create(driver)
+        db = AppDatabase(driver)
     }
 
     @Test

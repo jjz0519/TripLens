@@ -1,9 +1,9 @@
 package com.cooldog.triplens.repository
 
-import com.cooldog.triplens.db.TripLensDatabase
+import com.cooldog.triplens.db.AppDatabase
 import com.cooldog.triplens.model.TripGroup
 
-class TripRepository(private val db: TripLensDatabase) {
+class TripRepository(private val db: AppDatabase) {
 
     fun createGroup(id: String, name: String, now: Long) {
         db.tripGroupQueries.insert(id, name, now, now)

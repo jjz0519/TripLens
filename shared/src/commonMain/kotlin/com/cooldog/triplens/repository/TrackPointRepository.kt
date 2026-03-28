@@ -1,10 +1,10 @@
 package com.cooldog.triplens.repository
 
-import com.cooldog.triplens.db.TripLensDatabase
+import com.cooldog.triplens.db.AppDatabase
 import com.cooldog.triplens.model.TrackPoint
 import com.cooldog.triplens.model.TransportMode
 
-class TrackPointRepository(private val db: TripLensDatabase) {
+class TrackPointRepository(private val db: AppDatabase) {
 
     fun insert(point: TrackPointInsert) {
         db.trackPointQueries.insert(
