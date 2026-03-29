@@ -180,7 +180,7 @@ Each task entry:
 
 ---
 
-### Task 8: AudioRecorder
+### Task 8: AudioRecorder ✓ DONE
 
 **Goal**: Implement the voice note recorder that produces M4A (AAC-LC, 64kbps, mono) files in app-private storage.
 
@@ -190,11 +190,20 @@ Each task entry:
 - `AudioRecorder.kt` (`expect` interface in `commonMain`) with `start()`, `stop(): String` (returns file path), `cancel()`
 - `composeApp/src/main/.../AndroidAudioRecorder.kt` (`actual`) — uses `android.media.MediaRecorder`; output format `MPEG_4`, audio encoder `AAC`, bit rate 64000, channel count 1; saves to `{filesDir}/notes/{uuid}.m4a`
 
-**Tests to propose**:
-- Android instrumented: call `start()`, wait 2 seconds, call `stop()` → verify returned file path exists, file size > 0
-- `cancel()` after `start()` → file is deleted, `stop()` subsequently throws or is a no-op (no orphan files)
-- `stop()` without `start()` → throws `IllegalStateException` with clear message
-- Output file is a valid M4A container (verify magic bytes: `ftyp` box at offset 4)
+**Implementation notes**:
+- Plain interface pattern (not `expect`/`actual`) — consistent with Task 7's `GalleryScanner`
+- Placed in `shared/src/androidMain/` (not `composeApp/`) for consistency with existing platform impls
+- State: boolean `isRecording` flag; `cancel()` resets to idle (allows multiple recordings per instance)
+- API 31+ uses `MediaRecorder(context)`, API 26–30 uses deprecated no-arg constructor (`@Suppress`)
+- `stop()` catches `RuntimeException` from too-short recordings, deletes partial file, re-throws as `IllegalStateException`
+
+**Tests**:
+- `recordAndStop_fileExistsWithContent` — 2s recording → file exists, size > 0
+- `cancelAfterStart_fileIsDeleted` — cancel() leaves no orphan .m4a files (snapshot diff of notes/)
+- `stopAfterCancel_throwsIllegalStateException` — stop() in idle state throws with descriptive message
+- `stopWithoutStart_throwsIllegalStateException` — fresh instance, stop() throws
+- `outputIsValidM4AContainer` — bytes 4–7 of output file are ASCII "ftyp"
+- `outputPath_isInPrivateNotesDirectory` — path is under filesDir/notes/, ends with .m4a
 
 ---
 
@@ -460,7 +469,7 @@ Each task entry:
 | 5 | TransportClassifier + Smoother | Data | Algorithms, fully unit-tested |
 | 6 | LocationTrackingService | Platform | ForegroundService + recovery | ✓ |
 | 7 | GalleryScanner | Platform | MediaStore integration |
-| 8 | AudioRecorder | Platform | M4A voice note recording |
+| 8 | AudioRecorder | Platform | M4A voice note recording | ✓ |
 | 9 | Koin DI Setup | Domain | Full DI graph wired |
 | 10 | ExportUseCase | Domain | index.json + GPX + zip |
 | 11 | Navigation Graph | Navigation | All routes + dynamic start |
