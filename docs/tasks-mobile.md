@@ -255,7 +255,7 @@ Each task entry:
 
 ## Phase 4 — App Navigation
 
-### Task 11: Navigation Graph + App Shell
+### Task 11: Navigation Graph + App Shell ✓ DONE
 
 **Goal**: Set up Compose Navigation with all routes, dynamic start destination, and the conditional bottom navigation bar.
 

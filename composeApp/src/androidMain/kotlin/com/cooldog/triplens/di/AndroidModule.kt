@@ -9,7 +9,10 @@ import com.cooldog.triplens.platform.AndroidGalleryScanner
 import com.cooldog.triplens.platform.AudioRecorder
 import com.cooldog.triplens.platform.GalleryScanner
 import com.cooldog.triplens.platform.LocationProvider
+import com.cooldog.triplens.repository.SessionRepository
+import com.cooldog.triplens.ui.AppViewModel
 import org.koin.android.ext.koin.androidContext
+import org.koin.androidx.viewmodel.dsl.viewModel
 import org.koin.dsl.module
 
 /**
@@ -56,4 +59,11 @@ val androidModule = module {
 
     // File system — singleton: stateless, no session-specific state.
     single<PlatformFileSystem> { AndroidFileSystem(androidContext()) }
+
+    // AppViewModel — resolves the start destination by querying SessionRepository at launch.
+    // viewModel {} registers a Koin ViewModel factory; the same instance is returned for the
+    // same ViewModelStore (i.e., the same Activity), so App() and AppNavGraph() share one VM.
+    viewModel {
+        AppViewModel(getActiveSessionFn = { get<SessionRepository>().getActiveSession() })
+    }
 }
