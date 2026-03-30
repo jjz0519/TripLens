@@ -209,7 +209,7 @@ Each task entry:
 
 ## Phase 3 — Domain / Use Cases (commonMain)
 
-### Task 9: Koin Dependency Injection Setup
+### Task 9: Koin Dependency Injection Setup ✓ DONE
 
 **Goal**: Wire all repositories, use cases, and platform services into Koin modules; verify the full DI graph resolves without errors.
 
@@ -227,7 +227,7 @@ Each task entry:
 
 ---
 
-### Task 10: Export Use Case — index.json + GPX Writer
+### Task 10: Export Use Case — index.json + GPX Writer ✓ DONE
 
 **Goal**: Implement the full export pipeline: serialize a TripGroup to `index.json` (v1 schema with compact track keys), generate GPX 1.1 files per session, copy voice note files, and zip everything into a `.triplens` archive.
 
@@ -470,8 +470,8 @@ Each task entry:
 | 6 | LocationTrackingService | Platform | ForegroundService + recovery | ✓ |
 | 7 | GalleryScanner | Platform | MediaStore integration |
 | 8 | AudioRecorder | Platform | M4A voice note recording | ✓ |
-| 9 | Koin DI Setup | Domain | Full DI graph wired |
-| 10 | ExportUseCase | Domain | index.json + GPX + zip |
+| 9 | Koin DI Setup | Domain | Full DI graph wired | ✓ |
+| 10 | ExportUseCase | Domain | index.json + GPX + zip | ✓ |
 | 11 | Navigation Graph | Navigation | All routes + dynamic start |
 | 12 | Recording Screen — Idle | UI | Permissions + group selector |
 | 13 | Recording Screen — Active | UI | Live map + notes + stop |

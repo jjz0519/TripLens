@@ -14,6 +14,7 @@ kotlin {
         commonMain.dependencies {
             implementation(libs.kotlinx.serialization.json)
             implementation(libs.kotlinx.coroutines.core)
+            implementation(libs.kotlinx.datetime)
             implementation(libs.sqldelight.runtime)
             implementation(libs.sqldelight.coroutines)
             implementation(libs.koin.core)
@@ -22,6 +23,7 @@ kotlin {
             implementation(kotlin("test"))
             implementation(libs.kotlinx.coroutines.test)
             implementation(libs.sqldelight.sqlite.driver)
+            implementation(libs.koin.test)
         }
         androidMain.dependencies {
             implementation(libs.sqldelight.android.driver)

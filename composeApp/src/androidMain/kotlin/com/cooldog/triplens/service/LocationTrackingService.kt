@@ -1,7 +1,5 @@
 package com.cooldog.triplens.service
 
-import android.app.NotificationChannel
-import android.app.NotificationManager
 import android.app.Service
 import android.content.Context
 import android.content.Intent
@@ -9,8 +7,7 @@ import android.content.SharedPreferences
 import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
-import com.cooldog.triplens.db.AppDatabase
-import com.cooldog.triplens.db.DatabaseDriverFactory
+import com.cooldog.triplens.RECORDING_CHANNEL_ID
 import com.cooldog.triplens.domain.TransportClassifier
 import com.cooldog.triplens.platform.AccuracyProfile
 import com.cooldog.triplens.platform.LocationData
@@ -22,10 +19,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import org.koin.android.ext.android.inject
 
 private const val TAG = "TripLens/LocationService"
 
-private const val CHANNEL_ID      = "triplens_recording"
 private const val NOTIFICATION_ID = 1001
 private const val PREFS_NAME      = "triplens_service"
 private const val PREFS_SESSION_ID = "active_session_id"
@@ -62,10 +59,14 @@ private const val STATIONARY_SPEED_KMH   = 1.0f
  */
 class LocationTrackingService : Service() {
 
-    // --- Dependencies (created lazily; replaced by Koin in Task 9) ---
-    private lateinit var db: AppDatabase
-    private lateinit var trackPointRepo: TrackPointRepository
-    private lateinit var locationProvider: LocationProvider
+    // --- Dependencies injected by Koin ---
+    // by inject() is the KoinComponent delegate for Android framework classes (Service,
+    // Activity, etc.) where constructor injection is not possible. Koin resolves these
+    // from the graph started in TripLensApplication.onCreate(), which is guaranteed to
+    // run before any Service is created.
+    private val trackPointRepo: TrackPointRepository by inject()
+    private val locationProvider: LocationProvider   by inject()
+
     private lateinit var prefs: SharedPreferences
 
     // --- Session state ---
@@ -96,14 +97,12 @@ class LocationTrackingService : Service() {
         runningInstance = this
         Log.i(TAG, "onCreate")
 
-        db               = AppDatabase(DatabaseDriverFactory(this).createDriver())
-        trackPointRepo   = TrackPointRepository(db)
-        locationProvider = LocationProvider(this)
-        prefs            = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        // SharedPreferences is not in Koin — it is a low-level Android primitive that
+        // doesn't benefit from DI and its key constants belong in this class.
+        prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
-        // Notification channel must exist before startForeground(). Will be moved to
-        // Application.onCreate() in Task 9 to avoid repeated creation on service restart.
-        createNotificationChannel()
+        // Notification channel was created in TripLensApplication.onCreate().
+        // No setup required here.
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -322,20 +321,7 @@ class LocationTrackingService : Service() {
     // Notification
     // -------------------------------------------------------------------------
 
-    private fun createNotificationChannel() {
-        val channel = NotificationChannel(
-            CHANNEL_ID,
-            "TripLens Recording",
-            // IMPORTANCE_LOW: silent, no sound, no heads-up — respects background recording UX.
-            NotificationManager.IMPORTANCE_LOW
-        ).apply {
-            description = "Shown while TripLens is recording a trip"
-        }
-        val manager = getSystemService(NotificationManager::class.java)
-        manager.createNotificationChannel(channel)
-    }
-
-    private fun buildNotification() = NotificationCompat.Builder(this, CHANNEL_ID)
+    private fun buildNotification() = NotificationCompat.Builder(this, RECORDING_CHANNEL_ID)
         .setContentTitle("TripLens is recording")
         .setSmallIcon(android.R.drawable.ic_menu_mylocation)
         // No action buttons in MVP — stop is handled from the in-app UI.
