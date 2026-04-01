@@ -36,6 +36,9 @@ import com.cooldog.triplens.navigation.SessionReviewRoute
 import com.cooldog.triplens.navigation.SettingsRoute
 import com.cooldog.triplens.navigation.TripDetailRoute
 import com.cooldog.triplens.navigation.TripListRoute
+import com.cooldog.triplens.ui.onboarding.OnboardingScreen
+import com.cooldog.triplens.ui.onboarding.OnboardingViewModel
+import org.koin.androidx.compose.koinViewModel
 
 /**
  * Root NavHost for the app. Wraps all screens in a [Scaffold] with a conditional [AppBottomNavBar].
@@ -69,8 +72,16 @@ fun AppNavGraph(
             modifier = Modifier.padding(innerPadding),
         ) {
             composable<OnboardingRoute> {
-                // Stub — replaced with real OnboardingScreen in Task 6.
-                OnboardingScreenStub()
+                val onboardingViewModel: OnboardingViewModel = koinViewModel()
+                OnboardingScreen(
+                    viewModel = onboardingViewModel,
+                    onComplete = {
+                        navController.navigate(TripListRoute) {
+                            // Remove OnboardingRoute from the back stack so Back doesn't return to it.
+                            popUpTo<OnboardingRoute> { inclusive = true }
+                        }
+                    },
+                )
             }
             composable<TripListRoute> {
                 TripListScreenStub(
@@ -190,13 +201,6 @@ private fun navigateTopLevel(navController: NavHostController, route: Any) {
 // The onXxx callbacks are wired to real navigation now so back-stack
 // behavior is correct before the real screens exist.
 // ------------------------------------------------------------------
-
-@Composable
-private fun OnboardingScreenStub() {
-    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Text("Onboarding Screen")
-    }
-}
 
 @Composable
 private fun TripListScreenStub(onGroupClick: (groupId: String) -> Unit) {

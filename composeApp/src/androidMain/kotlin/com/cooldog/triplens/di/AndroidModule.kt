@@ -2,6 +2,8 @@ package com.cooldog.triplens.di
 
 import com.cooldog.triplens.db.AppDatabase
 import com.cooldog.triplens.db.DatabaseDriverFactory
+import com.cooldog.triplens.data.AppPreferences
+import com.cooldog.triplens.data.DataStoreAppPreferences
 import com.cooldog.triplens.export.AndroidFileSystem
 import com.cooldog.triplens.export.PlatformFileSystem
 import com.cooldog.triplens.platform.AndroidAudioRecorder
@@ -11,6 +13,7 @@ import com.cooldog.triplens.platform.GalleryScanner
 import com.cooldog.triplens.platform.LocationProvider
 import com.cooldog.triplens.repository.SessionRepository
 import com.cooldog.triplens.ui.AppViewModel
+import com.cooldog.triplens.ui.onboarding.OnboardingViewModel
 import org.koin.android.ext.koin.androidContext
 import org.koin.androidx.viewmodel.dsl.viewModel
 import org.koin.dsl.module
@@ -60,10 +63,21 @@ val androidModule = module {
     // File system — singleton: stateless, no session-specific state.
     single<PlatformFileSystem> { AndroidFileSystem(androidContext()) }
 
+    // AppPreferences — DataStore wrapper. Must be a singleton: DataStore must not be opened twice.
+    single<AppPreferences> { DataStoreAppPreferences(androidContext()) }
+
     // AppViewModel — resolves the start destination by querying SessionRepository at launch.
     // viewModel {} registers a Koin ViewModel factory; the same instance is returned for the
     // same ViewModelStore (i.e., the same Activity), so App() and AppNavGraph() share one VM.
     viewModel {
-        AppViewModel(getActiveSessionFn = { get<SessionRepository>().getActiveSession() })
+        AppViewModel(
+            getActiveSessionFn = { get<SessionRepository>().getActiveSession() },
+            isOnboardingCompleteFn = { get<AppPreferences>().isOnboardingComplete() },
+        )
+    }
+
+    // OnboardingViewModel — first-launch permission walkthrough.
+    viewModel {
+        OnboardingViewModel(appPreferences = get())
     }
 }
