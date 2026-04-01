@@ -22,8 +22,8 @@ import kotlin.test.assertEquals
  * This allows verifying both the initial [AppViewModel.StartDestination.Loading] state and
  * the resolved state after the IO query completes.
  *
- * No database or Koin is needed: [AppViewModel] accepts a [getActiveSessionFn] lambda so tests
- * supply a pure function rather than a real [SessionRepository].
+ * No database or Koin is needed: [AppViewModel] accepts lambdas for [getActiveSessionFn] and
+ * [isOnboardingCompleteFn] so tests supply pure functions rather than real dependencies.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class AppViewModelTest {
@@ -46,12 +46,14 @@ class AppViewModelTest {
     // Helpers
     // ------------------------------------------------------------------
 
-    private fun buildViewModel(activeSession: Session?): AppViewModel =
-        AppViewModel(
-            getActiveSessionFn = { activeSession },
-            // Use the test dispatcher for IO so advanceUntilIdle() controls all coroutines.
-            ioDispatcher = testDispatcher,
-        )
+    private fun buildViewModel(
+        activeSession: Session?,
+        isOnboardingComplete: Boolean = true,  // default keeps existing tests unaffected
+    ): AppViewModel = AppViewModel(
+        getActiveSessionFn = { activeSession },
+        isOnboardingCompleteFn = { isOnboardingComplete },
+        ioDispatcher = testDispatcher,
+    )
 
     private val aRecordingSession = Session(
         id        = "s1",
@@ -104,6 +106,7 @@ class AppViewModelTest {
         // DB errors (corruption, permission denial) must not crash the app or leave it on Loading.
         val vm = AppViewModel(
             getActiveSessionFn = { throw RuntimeException("DB corrupted") },
+            isOnboardingCompleteFn = { true },   // onboarding complete; only session query fails
             ioDispatcher = testDispatcher,
         )
         advanceUntilIdle()
@@ -112,5 +115,30 @@ class AppViewModelTest {
             vm.startDestination.value,
             "startDestination must fall back to TripList when the session query throws",
         )
+    }
+
+    @Test
+    fun startDestination_isOnboarding_whenOnboardingNotComplete() = runTest(testDispatcher) {
+        val vm = buildViewModel(activeSession = null, isOnboardingComplete = false)
+        advanceUntilIdle()
+        assertEquals(
+            AppViewModel.StartDestination.Onboarding,
+            vm.startDestination.value,
+            "startDestination must be Onboarding when onboarding has not been completed",
+        )
+    }
+
+    @Test
+    fun startDestination_isTripList_whenOnboardingCompleteAndNoSession() = runTest(testDispatcher) {
+        val vm = buildViewModel(activeSession = null, isOnboardingComplete = true)
+        advanceUntilIdle()
+        assertEquals(AppViewModel.StartDestination.TripList, vm.startDestination.value)
+    }
+
+    @Test
+    fun startDestination_isRecording_whenOnboardingCompleteAndSessionActive() = runTest(testDispatcher) {
+        val vm = buildViewModel(activeSession = aRecordingSession, isOnboardingComplete = true)
+        advanceUntilIdle()
+        assertEquals(AppViewModel.StartDestination.Recording, vm.startDestination.value)
     }
 }

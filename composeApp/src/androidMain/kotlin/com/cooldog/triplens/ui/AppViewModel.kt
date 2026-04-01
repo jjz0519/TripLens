@@ -13,25 +13,31 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * Resolves the app's start destination once on launch by checking for an active recording session.
+ * Resolves the app's start destination once on launch.
  *
- * ## Why a lambda, not SessionRepository directly?
- * [getActiveSessionFn] is a lambda so tests supply a pure function and avoid constructing a real
- * [com.cooldog.triplens.repository.SessionRepository] with a database. The lambda maps 1:1 to
- * [com.cooldog.triplens.repository.SessionRepository.getActiveSession] in production.
+ * ## Start destination priority
+ * 1. [StartDestination.Onboarding] — if [isOnboardingCompleteFn] returns false (first launch)
+ * 2. [StartDestination.Recording] — if an active recording session exists (killed mid-recording)
+ * 3. [StartDestination.TripList] — default
  *
- * ## Why an injectable [ioDispatcher]?
- * [getActiveSessionFn] is synchronous but must not run on the main thread (it queries SQLite).
- * Accepting [ioDispatcher] as a parameter lets tests pass the test dispatcher so
- * `advanceUntilIdle()` controls all coroutines deterministically without real IO thread races.
+ * ## Why lambdas, not direct dependencies?
+ * Both [getActiveSessionFn] and [isOnboardingCompleteFn] are lambdas so unit tests supply
+ * pure functions without constructing a real [com.cooldog.triplens.repository.SessionRepository]
+ * or DataStore. The lambda maps 1:1 to the real call sites in [com.cooldog.triplens.di.AndroidModule].
+ *
+ * ## Why injectable [ioDispatcher]?
+ * Both functions perform IO (SQLite and DataStore). Accepting [ioDispatcher] lets tests pass a
+ * test dispatcher so `advanceUntilIdle()` controls all coroutines deterministically.
  */
 class AppViewModel(
     private val getActiveSessionFn: () -> Session?,
+    private val isOnboardingCompleteFn: suspend () -> Boolean = { true },
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : ViewModel() {
 
     sealed interface StartDestination {
         data object Loading : StartDestination
+        data object Onboarding : StartDestination
         data object TripList : StartDestination
         data object Recording : StartDestination
     }
@@ -40,45 +46,40 @@ class AppViewModel(
     val startDestination: StateFlow<StartDestination> = _startDestination.asStateFlow()
 
     /**
-     * True while a recording session is active.
-     *
-     * Initialized from the startup DB check. Kept separate from [startDestination] so it can be
-     * updated independently at any time via [onSessionActiveChanged] — e.g., when RecordingViewModel
-     * (Task 12/13) starts or stops a session after the app is already running.
-     *
-     * Using [startDestination] directly as the source of truth for "is recording" would mean this
-     * state could never change after the initial startup resolution, since [_startDestination] is
-     * never written to again after init.
+     * True while a recording session is active. Initialized from the startup DB check.
+     * Updated at runtime via [onSessionActiveChanged] when RecordingViewModel starts/stops.
      */
     private val _isSessionActive = MutableStateFlow(false)
     val isSessionActive: StateFlow<Boolean> = _isSessionActive.asStateFlow()
 
-    /**
-     * Called by RecordingViewModel (Task 12/13) when a session is started or stopped from the UI.
-     * Updates the pulsing animation on the bottom-nav Record tab.
-     */
+    /** Called by RecordingScreen when a session starts or stops to update the bottom-nav pulse. */
     fun onSessionActiveChanged(isActive: Boolean) {
         Log.d(TAG, "onSessionActiveChanged: isActive=$isActive")
         _isSessionActive.value = isActive
     }
 
     init {
-        Log.d(TAG, "init: querying active session on startup")
+        Log.d(TAG, "init: resolving start destination")
         viewModelScope.launch {
-            val active = withContext(ioDispatcher) {
+            withContext(ioDispatcher) {
                 try {
-                    getActiveSessionFn()
+                    if (!isOnboardingCompleteFn()) {
+                        Log.i(TAG, "init: onboarding not complete → Onboarding")
+                        _startDestination.value = StartDestination.Onboarding
+                        return@withContext
+                    }
+                    val active = getActiveSessionFn()
+                    val isActive = active != null
+                    _isSessionActive.value = isActive
+                    val resolved = if (isActive) StartDestination.Recording else StartDestination.TripList
+                    Log.i(TAG, "init: resolved to $resolved (sessionId=${active?.id})")
+                    _startDestination.value = resolved
                 } catch (e: Exception) {
-                    // DB errors (e.g., corruption) are non-fatal; default to TripList.
-                    Log.e(TAG, "Failed to query active session at startup", e)
-                    null
+                    // DB or DataStore errors are non-fatal; default to TripList.
+                    Log.e(TAG, "Failed to resolve start destination", e)
+                    _startDestination.value = StartDestination.TripList
                 }
             }
-            val isActive = active != null
-            _isSessionActive.value = isActive
-            val resolved = if (isActive) StartDestination.Recording else StartDestination.TripList
-            Log.i(TAG, "init: resolved start destination to $resolved (sessionId=${active?.id})")
-            _startDestination.value = resolved
         }
     }
 
