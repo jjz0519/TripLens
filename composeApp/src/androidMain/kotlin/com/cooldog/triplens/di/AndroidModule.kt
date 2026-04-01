@@ -1,5 +1,7 @@
 package com.cooldog.triplens.di
 
+import android.content.Intent
+import androidx.core.content.ContextCompat
 import com.cooldog.triplens.db.AppDatabase
 import com.cooldog.triplens.db.DatabaseDriverFactory
 import com.cooldog.triplens.data.AppPreferences
@@ -12,8 +14,11 @@ import com.cooldog.triplens.platform.AudioRecorder
 import com.cooldog.triplens.platform.GalleryScanner
 import com.cooldog.triplens.platform.LocationProvider
 import com.cooldog.triplens.repository.SessionRepository
+import com.cooldog.triplens.repository.TripRepository
+import com.cooldog.triplens.service.LocationTrackingService
 import com.cooldog.triplens.ui.AppViewModel
 import com.cooldog.triplens.ui.onboarding.OnboardingViewModel
+import com.cooldog.triplens.ui.recording.RecordingViewModel
 import org.koin.android.ext.koin.androidContext
 import org.koin.androidx.viewmodel.dsl.viewModel
 import org.koin.dsl.module
@@ -79,5 +84,28 @@ val androidModule = module {
     // OnboardingViewModel — first-launch permission walkthrough.
     viewModel {
         OnboardingViewModel(appPreferences = get())
+    }
+
+    // RecordingViewModel — idle state machine for the Recording screen.
+    // startService lambda uses ContextCompat.startForegroundService to ensure correct behaviour
+    // on API 26+ where startService() alone does not allow foreground promotion.
+    viewModel {
+        val ctx = androidContext()
+        RecordingViewModel(
+            createGroupFn = { id, name, now ->
+                get<TripRepository>().createGroup(id, name, now)
+            },
+            createSessionFn = { id, groupId, name, startTime ->
+                get<SessionRepository>().createSession(id, groupId, name, startTime)
+            },
+            startService = { sessionId, profile ->
+                val intent = Intent(ctx, LocationTrackingService::class.java).apply {
+                    action = LocationTrackingService.ACTION_START
+                    putExtra(LocationTrackingService.EXTRA_SESSION_ID, sessionId)
+                    putExtra(LocationTrackingService.EXTRA_ACCURACY_PROFILE, profile.name)
+                }
+                ContextCompat.startForegroundService(ctx, intent)
+            },
+        )
     }
 }

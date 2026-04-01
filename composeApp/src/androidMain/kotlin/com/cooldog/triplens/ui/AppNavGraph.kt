@@ -38,6 +38,8 @@ import com.cooldog.triplens.navigation.TripDetailRoute
 import com.cooldog.triplens.navigation.TripListRoute
 import com.cooldog.triplens.ui.onboarding.OnboardingScreen
 import com.cooldog.triplens.ui.onboarding.OnboardingViewModel
+import com.cooldog.triplens.ui.recording.RecordingScreen
+import com.cooldog.triplens.ui.recording.RecordingViewModel
 import org.koin.androidx.compose.koinViewModel
 
 /**
@@ -89,7 +91,12 @@ fun AppNavGraph(
                 )
             }
             composable<RecordingRoute> {
-                RecordingScreenStub()
+                val recordingViewModel: RecordingViewModel = koinViewModel()
+                RecordingScreen(
+                    navController = navController,
+                    appViewModel = appViewModel,
+                    viewModel = recordingViewModel,
+                )
             }
             composable<SettingsRoute> {
                 SettingsScreenStub()
@@ -206,13 +213,6 @@ private fun navigateTopLevel(navController: NavHostController, route: Any) {
 private fun TripListScreenStub(onGroupClick: (groupId: String) -> Unit) {
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Text("Trip List Screen")
-    }
-}
-
-@Composable
-private fun RecordingScreenStub() {
-    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Text("Recording Screen")
     }
 }
 
