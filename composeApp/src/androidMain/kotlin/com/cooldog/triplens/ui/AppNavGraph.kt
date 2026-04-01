@@ -52,7 +52,8 @@ fun AppNavGraph(
     navController: NavHostController,
     startDestination: Any,
     isSessionActive: Boolean,
-    appViewModel: AppViewModel,        // ← new: passed down to screens that need it
+    // Passed to real screens in Task 6 (OnboardingScreen) and Task 8 (RecordingScreen).
+    appViewModel: AppViewModel,
 ) {
     Scaffold(
         bottomBar = {
