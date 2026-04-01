@@ -2,7 +2,7 @@
 
 **Date:** 2026-04-01  
 **Task ref:** `docs/tasks-mobile.md` § Task 12  
-**Status:** Approved by human owner
+**Status:** Approved by human owner — Implementation in progress (Tasks 1–4 done, Task 5 next)
 
 ---
 

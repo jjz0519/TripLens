@@ -12,6 +12,24 @@
 
 ---
 
+## Implementation Progress
+
+| Task | Status | Commit(s) |
+|------|--------|-----------|
+| Task 1: Add DataStore and MapLibre dependencies | ✅ DONE | b9e04a6 |
+| Task 2: AppPreferences DataStore interface | ✅ DONE | 2e3e059 |
+| Task 3: AppViewModel Onboarding start destination (TDD) | ✅ DONE | 6569991 |
+| Task 4: OnboardingRoute + nav wiring + AppNavGraph stub | ✅ DONE | f5cf0f8, d85cb5c |
+| Task 5: OnboardingViewModel + tests (TDD) | ⏳ NEXT | — |
+| Task 6: OnboardingScreen + NavGraph wire-up + DI registration | ⏳ PENDING | — |
+| Task 7: RecordingViewModel + tests (TDD) | ⏳ PENDING | — |
+| Task 8: RecordingScreen + PermissionRationaleDialog + NavGraph + DI | ⏳ PENDING | — |
+| Task 9: AppPreferences instrumented test | ⏳ PENDING | — |
+
+**Session ended mid-Task 5.** Resume from Task 5 next session.
+
+---
+
 ## File Map
 
 | Action | File |
