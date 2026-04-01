@@ -30,6 +30,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.toRoute
+import com.cooldog.triplens.navigation.OnboardingRoute
 import com.cooldog.triplens.navigation.RecordingRoute
 import com.cooldog.triplens.navigation.SessionReviewRoute
 import com.cooldog.triplens.navigation.SettingsRoute
@@ -43,12 +44,15 @@ import com.cooldog.triplens.navigation.TripListRoute
  * @param startDestination  One of the route objects resolved by [AppViewModel] at startup.
  * @param isSessionActive  True when a recording session is currently active; drives the pulsing
  *   animation on the Record tab. Provided by [AppViewModel.isSessionActive].
+ * @param appViewModel  Passed down to screens that need to call [AppViewModel] methods (e.g.
+ *   RecordingScreen calling onSessionActiveChanged) without injecting a second ViewModel instance.
  */
 @Composable
 fun AppNavGraph(
     navController: NavHostController,
     startDestination: Any,
     isSessionActive: Boolean,
+    appViewModel: AppViewModel,        // ← new: passed down to screens that need it
 ) {
     Scaffold(
         bottomBar = {
@@ -63,6 +67,10 @@ fun AppNavGraph(
             startDestination = startDestination,
             modifier = Modifier.padding(innerPadding),
         ) {
+            composable<OnboardingRoute> {
+                // Stub — replaced with real OnboardingScreen in Task 6.
+                OnboardingScreenStub()
+            }
             composable<TripListRoute> {
                 TripListScreenStub(
                     onGroupClick = { groupId -> navController.navigate(TripDetailRoute(groupId)) },
@@ -181,6 +189,13 @@ private fun navigateTopLevel(navController: NavHostController, route: Any) {
 // The onXxx callbacks are wired to real navigation now so back-stack
 // behavior is correct before the real screens exist.
 // ------------------------------------------------------------------
+
+@Composable
+private fun OnboardingScreenStub() {
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Text("Onboarding Screen")
+    }
+}
 
 @Composable
 private fun TripListScreenStub(onGroupClick: (groupId: String) -> Unit) {

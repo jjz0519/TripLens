@@ -34,3 +34,7 @@ data class TripDetailRoute(val groupId: String)
 /** Detail: full-screen session review with map and timeline. Reached from TripDetailRoute. */
 @Serializable
 data class SessionReviewRoute(val sessionId: String)
+
+/** Shown once on first launch for permission onboarding. Not included in BottomNavBar. */
+@Serializable
+object OnboardingRoute
