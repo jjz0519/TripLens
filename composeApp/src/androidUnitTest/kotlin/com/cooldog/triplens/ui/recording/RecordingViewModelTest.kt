@@ -1,6 +1,7 @@
 package com.cooldog.triplens.ui.recording
 
 import com.cooldog.triplens.platform.AccuracyProfile
+import com.cooldog.triplens.platform.AudioRecorder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
@@ -17,10 +18,12 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /**
- * Unit tests for [RecordingViewModel].
+ * Unit tests for [RecordingViewModel] idle-state behavior (Task 12 coverage).
  *
- * [RecordingViewModel] takes lambdas for all external calls (DB writes, service start) so tests
- * run entirely on the JVM — no Android context, Koin, or database required.
+ * Active-state tests live in [RecordingViewModelActiveTest].
+ *
+ * [RecordingViewModel] takes a [RecordingDeps] bundle so all external calls can be
+ * replaced with pure lambdas — no Android runtime, Koin, or database required.
  *
  * [FIXED_EPOCH] = 0L (1970-01-01 UTC) keeps date arithmetic unambiguous across timezones.
  */
@@ -29,42 +32,60 @@ class RecordingViewModelTest {
 
     private val testDispatcher = StandardTestDispatcher()
 
-    @Before fun setUp() { Dispatchers.setMain(testDispatcher) }
+    @Before fun setUp()    { Dispatchers.setMain(testDispatcher) }
     @After  fun tearDown() { Dispatchers.resetMain() }
 
-    private val FIXED_EPOCH = 0L  // 1970-01-01 UTC
+    private val FIXED_EPOCH = 0L
 
     // Captured call arguments.
-    private var capturedGroupId: String? = null
-    private var capturedGroupName: String? = null
-    private var capturedGroupNow: Long? = null
-    private var capturedSessionId: String? = null
-    private var capturedSessionGroupId: String? = null
-    private var capturedSessionName: String? = null
-    private var capturedSessionStartTime: Long? = null
+    private var capturedGroupId:          String? = null
+    private var capturedGroupName:        String? = null
+    private var capturedGroupNow:         Long?   = null
+    private var capturedSessionId:        String? = null
+    private var capturedSessionGroupId:   String? = null
+    private var capturedSessionName:      String? = null
+    private var capturedSessionStartTime: Long?   = null
     private var capturedServiceSessionId: String? = null
-    private var capturedServiceProfile: AccuracyProfile? = null
+    private var capturedServiceProfile:   AccuracyProfile? = null
     private var createGroupCallCount = 0
 
+    /** No-op AudioRecorder so idle tests compile without caring about voice recording. */
+    private val noOpRecorder = object : AudioRecorder {
+        override fun start()         = Unit
+        override fun stop(): String  = ""
+        override fun cancel()        = Unit
+    }
+
     private fun buildViewModel() = RecordingViewModel(
-        createGroupFn = { id, name, now ->
-            createGroupCallCount++
-            capturedGroupId = id
-            capturedGroupName = name
-            capturedGroupNow = now
-        },
-        createSessionFn = { id, groupId, name, startTime ->
-            capturedSessionId = id
-            capturedSessionGroupId = groupId
-            capturedSessionName = name
-            capturedSessionStartTime = startTime
-        },
-        startService = { sessionId, profile ->
-            capturedServiceSessionId = sessionId
-            capturedServiceProfile = profile
-        },
-        clock = { FIXED_EPOCH },
-        ioDispatcher = testDispatcher,
+        RecordingDeps(
+            createGroupFn    = { id, name, now ->
+                createGroupCallCount++
+                capturedGroupId   = id
+                capturedGroupName = name
+                capturedGroupNow  = now
+            },
+            createSessionFn  = { id, groupId, name, startTime ->
+                capturedSessionId        = id
+                capturedSessionGroupId   = groupId
+                capturedSessionName      = name
+                capturedSessionStartTime = startTime
+            },
+            startService     = { sessionId, profile ->
+                capturedServiceSessionId = sessionId
+                capturedServiceProfile   = profile
+            },
+            // Active-state dependencies are no-ops — idle tests never enter ActiveRecording.
+            getTrackPointsFn  = { emptyList() },
+            getMediaRefsFn    = { emptyList() },
+            getNotesFn        = { emptyList() },
+            createTextNoteFn  = { _, _, _, _, _, _ -> },
+            createVoiceNoteFn = { _, _, _, _, _, _, _ -> },
+            completeSessionFn = { _, _ -> },
+            stopServiceFn     = {},
+            audioRecorder     = noOpRecorder,
+            clock             = { FIXED_EPOCH },
+            ioDispatcher      = testDispatcher,
+        )
     )
 
     @Test
@@ -91,7 +112,7 @@ class RecordingViewModelTest {
     fun onStartTapped_locationGranted_transitionsToStartingSession() = runTest(testDispatcher) {
         val vm = buildViewModel()
         vm.onStartTapped(locationGranted = true)
-        advanceUntilIdle()
+        // Before IO completes the state must be StartingSession.
         assertEquals(RecordingViewModel.UiState.StartingSession, vm.uiState.value)
     }
 

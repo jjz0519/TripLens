@@ -472,8 +472,8 @@ Each task entry:
 | 8 | AudioRecorder | Platform | M4A voice note recording | ✓ |
 | 9 | Koin DI Setup | Domain | Full DI graph wired | ✓ |
 | 10 | ExportUseCase | Domain | index.json + GPX + zip | ✓ |
-| 11 | Navigation Graph | Navigation | All routes + dynamic start |
-| 12 | Recording Screen — Idle | UI | Permissions + group selector |
+| 11 | Navigation Graph | Navigation | All routes + dynamic start | ✓ |
+| 12 | Recording Screen — Idle | UI | Permissions + group selector | ✓ |
 | 13 | Recording Screen — Active | UI | Live map + notes + stop |
 | 14 | Trip List + Detail Screens | UI | Group cards + session list |
 | 15 | Session Review Screen | UI | Full-trip map + timeline |
