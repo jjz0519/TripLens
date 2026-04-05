@@ -16,6 +16,7 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
@@ -25,23 +26,48 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
+import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.cancel
 
 /**
  * Unit tests for [RecordingViewModel] active-recording state.
  *
- * All tests reach [RecordingViewModel.UiState.ActiveRecording] by calling
- * `onStartTapped(locationGranted = true)` and then `advanceUntilIdle()`.
+ * All tests reach [RecordingViewModel.UiState.ActiveRecording] via [startSession], which calls
+ * `onStartTapped(locationGranted = true)` then [runCurrent].
+ *
+ * ## Why runCurrent instead of advanceUntilIdle
+ * [advanceUntilIdle] advances virtual time until no pending tasks remain. The ViewModel's timer
+ * loop (`while(isActive) { delay(1_000L); increment }`) and poll loop
+ * (`while(isActive) { refreshData(); delay(5_000L) }`) are infinite, so [advanceUntilIdle] never
+ * returns — it keeps advancing through future delay iterations forever.
+ *
+ * [runCurrent] only runs tasks that are ready at the *current* virtual time (≤ currentTime). It
+ * does NOT advance virtual time, so delay-gated future iterations never execute and the call
+ * returns promptly.
+ *
+ * [advanceUntilIdle] is safe **only** after [RecordingViewModel.onStopConfirmed], which calls
+ * `cancelActiveLoops()` before any IO work. Once the loops are cancelled their delays resolve with
+ * [CancellationException] and terminate, leaving no infinite tasks for [advanceUntilIdle] to chase.
  *
  * [FIXED_EPOCH] = 0L (1970-01-01 UTC) keeps date arithmetic deterministic.
- * Timer and poll loops use coroutine [delay] so [advanceTimeBy] controls them.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class RecordingViewModelActiveTest {
 
     private val testDispatcher = StandardTestDispatcher()
+    private val viewModels = mutableListOf<RecordingViewModel>()
 
     @Before fun setUp()    { Dispatchers.setMain(testDispatcher) }
     @After  fun tearDown() { Dispatchers.resetMain() }
+
+    private fun runRecordingTest(block: suspend kotlinx.coroutines.test.TestScope.() -> Unit) = runTest(testDispatcher) {
+        try {
+            block()
+        } finally {
+            viewModels.forEach { it.viewModelScope.cancel() }
+            viewModels.clear()
+        }
+    }
 
     private val FIXED_EPOCH = 0L
 
@@ -113,19 +139,26 @@ class RecordingViewModelActiveTest {
             clock              = { FIXED_EPOCH },
             ioDispatcher       = testDispatcher,
         )
-    )
+    ).also { viewModels.add(it) }
 
-    /** Advances the vm to [RecordingViewModel.UiState.ActiveRecording] and returns the state. */
-    private suspend fun startSession(vm: RecordingViewModel): RecordingViewModel.UiState.ActiveRecording {
+    /**
+     * Advances the vm to [RecordingViewModel.UiState.ActiveRecording] and returns the state.
+     *
+     * Uses [runCurrent] rather than [advanceUntilIdle] to avoid advancing virtual time into the
+     * infinite timer and poll loops that start with the session. [runCurrent] drains all coroutines
+     * that are ready at the current virtual time (the IO work, state transition, first poll) without
+     * touching future-scheduled [delay] tasks, so it returns promptly.
+     */
+    private suspend fun kotlinx.coroutines.test.TestScope.startSession(vm: RecordingViewModel): RecordingViewModel.UiState.ActiveRecording {
         vm.onStartTapped(locationGranted = true)
-        advanceUntilIdle()  // runs IO, sets state, launches timer/poll loops, first poll
+        runCurrent()  // drains IO + first poll; does NOT advance into timer/poll delay loops
         return assertIs(vm.uiState.value)
     }
 
     // ── Transition tests ─────────────────────────────────────────────────────────
 
     @Test
-    fun onStartTapped_locationGranted_transitionsToActiveRecording() = runTest(testDispatcher) {
+    fun onStartTapped_locationGranted_transitionsToActiveRecording() = runRecordingTest {
         val vm = buildViewModel()
         val state = startSession(vm)
         assertTrue(state.groupName.matches(Regex("\\d{4}-\\d{2}-\\d{2}")))
@@ -134,22 +167,24 @@ class RecordingViewModelActiveTest {
     // ── Timer tests ──────────────────────────────────────────────────────────────
 
     @Test
-    fun timer_incrementsElapsedSeconds_eachSecond() = runTest(testDispatcher) {
+    fun timer_incrementsElapsedSeconds_eachSecond() = runRecordingTest {
         val vm = buildViewModel()
         startSession(vm)
 
-        advanceTimeBy(3_000L)
+        advanceTimeBy(3_001L)
 
         val state = assertIs<RecordingViewModel.UiState.ActiveRecording>(vm.uiState.value)
         assertEquals(3L, state.elapsedSeconds)
     }
 
     @Test
-    fun timer_doesNotRunAfterStopConfirmed() = runTest(testDispatcher) {
+    fun timer_doesNotRunAfterStopConfirmed() = runRecordingTest {
         val vm = buildViewModel()
         startSession(vm)
 
         vm.onStopConfirmed()
+        // Safe to use advanceUntilIdle here: cancelActiveLoops() removes the infinite timer/poll
+        // loops before the IO work runs, so advanceUntilIdle terminates after the finite IO tasks.
         advanceUntilIdle()
 
         // Advance time — timer loop should have been cancelled, so elapsed stays at 0.
@@ -162,44 +197,46 @@ class RecordingViewModelActiveTest {
     // ── Poll tests ───────────────────────────────────────────────────────────────
 
     @Test
-    fun poll_firstPollRunsImmediately_populatesTrackPoints() = runTest(testDispatcher) {
+    fun poll_firstPollRunsImmediately_populatesTrackPoints() = runRecordingTest {
         fakeTrackPoints = listOf(makeTrackPoint(id = 1L))
         val vm = buildViewModel()
-        startSession(vm)  // advanceUntilIdle runs first poll
+        startSession(vm)  // runCurrent runs first poll
 
         val state = assertIs<RecordingViewModel.UiState.ActiveRecording>(vm.uiState.value)
         assertEquals(1, state.trackPoints.size)
     }
 
     @Test
-    fun poll_updatesTrackPointsAfterPollInterval() = runTest(testDispatcher) {
+    fun poll_updatesTrackPointsAfterPollInterval() = runRecordingTest {
         val vm = buildViewModel()
         startSession(vm)
 
         // Inject new points that the next poll will return.
         fakeTrackPoints = listOf(makeTrackPoint(1L), makeTrackPoint(2L))
+        // advanceTimeBy advances virtual time AND runs tasks scheduled up to that time.
+        // The poll delay is 5 000 ms, so the poll at t=5 000 runs and updates state.
+        // No advanceUntilIdle here — that would advance into the NEXT poll iteration (t=10 000)
+        // and then t=15 000 etc., causing an infinite loop.
         advanceTimeBy(5_001L)
-        advanceUntilIdle()
 
         val state = assertIs<RecordingViewModel.UiState.ActiveRecording>(vm.uiState.value)
         assertEquals(2, state.trackPoints.size)
     }
 
     @Test
-    fun poll_recentMediaCappedAt10() = runTest(testDispatcher) {
+    fun poll_recentMediaCappedAt10() = runRecordingTest {
         val vm = buildViewModel()
         startSession(vm)
 
         fakeNotes = (1..15).map { makeTextNote(id = "note-$it", createdAt = it.toLong()) }
         advanceTimeBy(5_001L)
-        advanceUntilIdle()
 
         val state = assertIs<RecordingViewModel.UiState.ActiveRecording>(vm.uiState.value)
         assertEquals(10, state.recentMedia.size)
     }
 
     @Test
-    fun poll_recentMedia_sortedNewestFirst() = runTest(testDispatcher) {
+    fun poll_recentMedia_sortedNewestFirst() = runRecordingTest {
         val vm = buildViewModel()
         startSession(vm)
 
@@ -209,7 +246,6 @@ class RecordingViewModelActiveTest {
             makeTextNote("note-new", createdAt = 200L),
         )
         advanceTimeBy(5_001L)
-        advanceUntilIdle()
 
         val state = assertIs<RecordingViewModel.UiState.ActiveRecording>(vm.uiState.value)
         assertEquals("note-new", state.recentMedia.first().id)
@@ -219,18 +255,18 @@ class RecordingViewModelActiveTest {
     // ── onSaveTextNote tests ──────────────────────────────────────────────────────
 
     @Test
-    fun onSaveTextNote_callsCreateTextNoteFn_withContent() = runTest(testDispatcher) {
+    fun onSaveTextNote_callsCreateTextNoteFn_withContent() = runRecordingTest {
         val vm = buildViewModel()
         startSession(vm)
 
         vm.onSaveTextNote("Great view here!")
-        advanceUntilIdle()
+        runCurrent()
 
         assertEquals("Great view here!", capturedTextNoteContent)
     }
 
     @Test
-    fun onSaveTextNote_usesLastNonPausedTrackPointForLocation() = runTest(testDispatcher) {
+    fun onSaveTextNote_usesLastNonPausedTrackPointForLocation() = runRecordingTest {
         fakeTrackPoints = listOf(
             makeTrackPoint(id = 1L, lat = 51.5, lng = -0.1, isAutoPaused = false),
         )
@@ -238,27 +274,27 @@ class RecordingViewModelActiveTest {
         startSession(vm)  // first poll loads fakeTrackPoints
 
         vm.onSaveTextNote("test note")
-        advanceUntilIdle()
+        runCurrent()
 
         assertEquals(51.5, capturedTextNoteLat)
         assertEquals(-0.1, capturedTextNoteLng)
     }
 
     @Test
-    fun onSaveTextNote_usesZeroZero_whenNoTrackPoints() = runTest(testDispatcher) {
+    fun onSaveTextNote_usesZeroZero_whenNoTrackPoints() = runRecordingTest {
         fakeTrackPoints = emptyList()
         val vm = buildViewModel()
         startSession(vm)
 
         vm.onSaveTextNote("note with no GPS yet")
-        advanceUntilIdle()
+        runCurrent()
 
         assertEquals(0.0, capturedTextNoteLat)
         assertEquals(0.0, capturedTextNoteLng)
     }
 
     @Test
-    fun onSaveTextNote_triggersImmediateRefresh_updatesMediaStrip() = runTest(testDispatcher) {
+    fun onSaveTextNote_triggersImmediateRefresh_updatesMediaStrip() = runRecordingTest {
         val vm = buildViewModel()
         startSession(vm)
 
@@ -266,7 +302,7 @@ class RecordingViewModelActiveTest {
         fakeNotes = listOf(makeTextNote("note-1", createdAt = 999L))
 
         vm.onSaveTextNote("test")
-        advanceUntilIdle()
+        runCurrent()
 
         val state = assertIs<RecordingViewModel.UiState.ActiveRecording>(vm.uiState.value)
         assertEquals(1, state.recentMedia.size)
@@ -275,52 +311,52 @@ class RecordingViewModelActiveTest {
     // ── Voice note tests ──────────────────────────────────────────────────────────
 
     @Test
-    fun onVoiceNoteStart_setsIsVoiceRecordingTrue() = runTest(testDispatcher) {
+    fun onVoiceNoteStart_setsIsVoiceRecordingTrue() = runRecordingTest {
         val vm = buildViewModel()
         startSession(vm)
 
         vm.onVoiceNoteStart()
-        advanceUntilIdle()
+        runCurrent()
 
         val state = assertIs<RecordingViewModel.UiState.ActiveRecording>(vm.uiState.value)
         assertTrue(state.isVoiceRecording)
     }
 
     @Test
-    fun onVoiceNoteStart_callsAudioRecorderStart() = runTest(testDispatcher) {
+    fun onVoiceNoteStart_callsAudioRecorderStart() = runRecordingTest {
         val vm = buildViewModel()
         startSession(vm)
 
         vm.onVoiceNoteStart()
-        advanceUntilIdle()
+        runCurrent()
 
         assertEquals(1, fakeRecorder.startCount)
     }
 
     @Test
-    fun voiceTimer_incrementsVoiceElapsedSeconds() = runTest(testDispatcher) {
+    fun voiceTimer_incrementsVoiceElapsedSeconds() = runRecordingTest {
         val vm = buildViewModel()
         startSession(vm)
 
         vm.onVoiceNoteStart()
-        advanceUntilIdle()
+        runCurrent()
 
-        advanceTimeBy(4_000L)
+        advanceTimeBy(4_001L)
 
         val state = assertIs<RecordingViewModel.UiState.ActiveRecording>(vm.uiState.value)
         assertEquals(4L, state.voiceElapsedSeconds)
     }
 
     @Test
-    fun onVoiceNoteStop_callsAudioRecorderStop_andClearsVoiceRecordingState() = runTest(testDispatcher) {
+    fun onVoiceNoteStop_callsAudioRecorderStop_andClearsVoiceRecordingState() = runRecordingTest {
         val vm = buildViewModel()
         startSession(vm)
 
         vm.onVoiceNoteStart()
-        advanceUntilIdle()
+        runCurrent()
 
         vm.onVoiceNoteStop()
-        advanceUntilIdle()
+        runCurrent()
 
         assertEquals(1, fakeRecorder.stopCount)
         val state = assertIs<RecordingViewModel.UiState.ActiveRecording>(vm.uiState.value)
@@ -329,61 +365,61 @@ class RecordingViewModelActiveTest {
     }
 
     @Test
-    fun onVoiceNoteStop_callsCreateVoiceNoteFn_withBareFilename() = runTest(testDispatcher) {
+    fun onVoiceNoteStop_callsCreateVoiceNoteFn_withBareFilename() = runRecordingTest {
         val vm = buildViewModel()
         startSession(vm)
 
         vm.onVoiceNoteStart()
-        advanceUntilIdle()
+        runCurrent()
 
         vm.onVoiceNoteStop()
-        advanceUntilIdle()
+        runCurrent()
 
         // Must be the bare filename, not the full path.
         assertEquals("note_test.m4a", capturedVoiceFilename)
     }
 
     @Test
-    fun onVoiceNoteStop_durationMatchesVoiceElapsed() = runTest(testDispatcher) {
+    fun onVoiceNoteStop_durationMatchesVoiceElapsed() = runRecordingTest {
         val vm = buildViewModel()
         startSession(vm)
 
         vm.onVoiceNoteStart()
-        advanceUntilIdle()
+        runCurrent()
 
         // Advance voice timer by 7 seconds before stopping.
-        advanceTimeBy(7_000L)
+        advanceTimeBy(7_001L)
 
         vm.onVoiceNoteStop()
-        advanceUntilIdle()
+        runCurrent()
 
         assertEquals(7, capturedVoiceDuration)
     }
 
     @Test
-    fun onVoiceNoteStop_whenRecorderThrows_clearsVoiceState() = runTest(testDispatcher) {
+    fun onVoiceNoteStop_whenRecorderThrows_clearsVoiceState() = runRecordingTest {
         val vm = buildViewModel()
         startSession(vm)
 
         fakeRecorder.throwOnStop = true
         vm.onVoiceNoteStart()
-        advanceUntilIdle()
+        runCurrent()
         vm.onVoiceNoteStop()
-        advanceUntilIdle()
+        runCurrent()
 
         val state = assertIs<RecordingViewModel.UiState.ActiveRecording>(vm.uiState.value)
         assertFalse(state.isVoiceRecording)
     }
 
     @Test
-    fun onVoiceNoteStart_ignoredIfAlreadyRecording() = runTest(testDispatcher) {
+    fun onVoiceNoteStart_ignoredIfAlreadyRecording() = runRecordingTest {
         val vm = buildViewModel()
         startSession(vm)
 
         vm.onVoiceNoteStart()
-        advanceUntilIdle()
+        runCurrent()
         vm.onVoiceNoteStart()  // second tap — must be ignored
-        advanceUntilIdle()
+        runCurrent()
 
         assertEquals(1, fakeRecorder.startCount)
     }
@@ -391,7 +427,7 @@ class RecordingViewModelActiveTest {
     // ── Stop confirmation tests ───────────────────────────────────────────────────
 
     @Test
-    fun onStopTapped_emitsShowStopConfirmation() = runTest(testDispatcher) {
+    fun onStopTapped_emitsShowStopConfirmation() = runRecordingTest {
         val vm = buildViewModel()
         startSession(vm)
 
@@ -399,28 +435,28 @@ class RecordingViewModelActiveTest {
         val job = launch { vm.events.collect { events.add(it) } }
 
         vm.onStopTapped()
-        advanceUntilIdle()
+        runCurrent()
 
         assertTrue(RecordingViewModel.Event.ShowStopConfirmation in events)
         job.cancel()
     }
 
     @Test
-    fun onStopTapped_ignoredIfNotActive() = runTest(testDispatcher) {
+    fun onStopTapped_ignoredIfNotActive() = runRecordingTest {
         val vm = buildViewModel()
         // State is Idle — stop tap must be a no-op.
         val events = mutableListOf<RecordingViewModel.Event>()
         val job = launch { vm.events.collect { events.add(it) } }
 
         vm.onStopTapped()
-        advanceUntilIdle()
+        runCurrent()
 
         assertFalse(RecordingViewModel.Event.ShowStopConfirmation in events)
         job.cancel()
     }
 
     @Test
-    fun onStopConfirmed_callsCompleteSessionAndStopService() = runTest(testDispatcher) {
+    fun onStopConfirmed_callsCompleteSessionAndStopService() = runRecordingTest {
         val vm = buildViewModel()
         startSession(vm)
 
@@ -432,7 +468,7 @@ class RecordingViewModelActiveTest {
     }
 
     @Test
-    fun onStopConfirmed_emitsNavigateToSessionReview() = runTest(testDispatcher) {
+    fun onStopConfirmed_emitsNavigateToSessionReview() = runRecordingTest {
         val vm = buildViewModel()
         startSession(vm)
 
@@ -447,12 +483,12 @@ class RecordingViewModelActiveTest {
     }
 
     @Test
-    fun onStopConfirmed_cancelsVoiceRecording_whenActive() = runTest(testDispatcher) {
+    fun onStopConfirmed_cancelsVoiceRecording_whenActive() = runRecordingTest {
         val vm = buildViewModel()
         startSession(vm)
 
         vm.onVoiceNoteStart()
-        advanceUntilIdle()
+        runCurrent()
 
         vm.onStopConfirmed()
         advanceUntilIdle()
@@ -461,7 +497,7 @@ class RecordingViewModelActiveTest {
     }
 
     @Test
-    fun onStopConfirmed_doesNotCancelVoice_whenNotRecording() = runTest(testDispatcher) {
+    fun onStopConfirmed_doesNotCancelVoice_whenNotRecording() = runRecordingTest {
         val vm = buildViewModel()
         startSession(vm)
 
@@ -475,7 +511,7 @@ class RecordingViewModelActiveTest {
     // ── Camera follow tests ───────────────────────────────────────────────────────
 
     @Test
-    fun onMapPanned_setsCameraFollowingFalse() = runTest(testDispatcher) {
+    fun onMapPanned_setsCameraFollowingFalse() = runRecordingTest {
         val vm = buildViewModel()
         startSession(vm)
 
@@ -486,7 +522,7 @@ class RecordingViewModelActiveTest {
     }
 
     @Test
-    fun onRecenterTapped_setsCameraFollowingTrue() = runTest(testDispatcher) {
+    fun onRecenterTapped_setsCameraFollowingTrue() = runRecordingTest {
         val vm = buildViewModel()
         startSession(vm)
 

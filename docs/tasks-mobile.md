@@ -300,7 +300,7 @@ Each task entry:
 
 ---
 
-### Task 13: Recording Screen — Active State + Map
+### Task 13: Recording Screen — Active State + Map ✓ DONE
 
 **Goal**: Implement the active recording screen: real-time map with colored polyline, media markers, bottom panel with note buttons and media strip, and the stop recording flow.
 
@@ -474,7 +474,7 @@ Each task entry:
 | 10 | ExportUseCase | Domain | index.json + GPX + zip | ✓ |
 | 11 | Navigation Graph | Navigation | All routes + dynamic start | ✓ |
 | 12 | Recording Screen — Idle | UI | Permissions + group selector | ✓ |
-| 13 | Recording Screen — Active | UI | Live map + notes + stop |
+| 13 | Recording Screen — Active | UI | Live map + notes + stop | ✓ |
 | 14 | Trip List + Detail Screens | UI | Group cards + session list |
 | 15 | Session Review Screen | UI | Full-trip map + timeline |
 | 16 | Settings Screen | UI | DataStore-backed preferences |

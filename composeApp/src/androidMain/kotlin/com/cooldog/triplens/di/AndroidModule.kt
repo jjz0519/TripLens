@@ -13,11 +13,15 @@ import com.cooldog.triplens.platform.AndroidGalleryScanner
 import com.cooldog.triplens.platform.AudioRecorder
 import com.cooldog.triplens.platform.GalleryScanner
 import com.cooldog.triplens.platform.LocationProvider
+import com.cooldog.triplens.repository.MediaRefRepository
+import com.cooldog.triplens.repository.NoteRepository
 import com.cooldog.triplens.repository.SessionRepository
+import com.cooldog.triplens.repository.TrackPointRepository
 import com.cooldog.triplens.repository.TripRepository
 import com.cooldog.triplens.service.LocationTrackingService
 import com.cooldog.triplens.ui.AppViewModel
 import com.cooldog.triplens.ui.onboarding.OnboardingViewModel
+import com.cooldog.triplens.ui.recording.RecordingDeps
 import com.cooldog.triplens.ui.recording.RecordingViewModel
 import org.koin.android.ext.koin.androidContext
 import org.koin.androidx.viewmodel.dsl.viewModel
@@ -86,26 +90,71 @@ val androidModule = module {
         OnboardingViewModel(appPreferences = get())
     }
 
-    // RecordingViewModel — idle state machine for the Recording screen.
-    // startService lambda uses ContextCompat.startForegroundService to ensure correct behaviour
-    // on API 26+ where startService() alone does not allow foreground promotion.
+    // RecordingViewModel — full recording state machine (idle → active → review).
+    //
+    // All external calls are bundled in RecordingDeps to prevent accidental lambda swap bugs:
+    // several lambdas share identical functional types and would be undetectable by position alone.
+    //
+    // audioRecorder is resolved via get<AudioRecorder>() which maps to the factory binding above,
+    // so each ViewModel instance gets a fresh recorder with clean state.
     viewModel {
         val ctx = androidContext()
         RecordingViewModel(
-            createGroupFn = { id, name, now ->
-                get<TripRepository>().createGroup(id, name, now)
-            },
-            createSessionFn = { id, groupId, name, startTime ->
-                get<SessionRepository>().createSession(id, groupId, name, startTime)
-            },
-            startService = { sessionId, profile ->
-                val intent = Intent(ctx, LocationTrackingService::class.java).apply {
-                    action = LocationTrackingService.ACTION_START
-                    putExtra(LocationTrackingService.EXTRA_SESSION_ID, sessionId)
-                    putExtra(LocationTrackingService.EXTRA_ACCURACY_PROFILE, profile.name)
-                }
-                ContextCompat.startForegroundService(ctx, intent)
-            },
+            deps = RecordingDeps(
+                // ── Idle → Active transition ──────────────────────────────────────────
+                createGroupFn = { id, name, now ->
+                    get<TripRepository>().createGroup(id, name, now)
+                },
+                createSessionFn = { id, groupId, name, startTime ->
+                    get<SessionRepository>().createSession(id, groupId, name, startTime)
+                },
+                // ContextCompat.startForegroundService is required on API 26+: plain
+                // startService() cannot promote a service to foreground on those versions.
+                startService = { sessionId, profile ->
+                    val intent = Intent(ctx, LocationTrackingService::class.java).apply {
+                        action = LocationTrackingService.ACTION_START
+                        putExtra(LocationTrackingService.EXTRA_SESSION_ID, sessionId)
+                        putExtra(LocationTrackingService.EXTRA_ACCURACY_PROFILE, profile.name)
+                    }
+                    ContextCompat.startForegroundService(ctx, intent)
+                },
+
+                // ── Active state — data fetching (polled every 5 s) ──────────────────
+                getTrackPointsFn = { sessionId ->
+                    get<TrackPointRepository>().getBySession(sessionId)
+                },
+                getMediaRefsFn = { sessionId ->
+                    get<MediaRefRepository>().getBySession(sessionId)
+                },
+                getNotesFn = { sessionId ->
+                    get<NoteRepository>().getBySession(sessionId)
+                },
+
+                // ── Active state — writes ────────────────────────────────────────────
+                createTextNoteFn = { id, sessionId, content, createdAt, lat, lng ->
+                    get<NoteRepository>().createTextNote(id, sessionId, content, createdAt, lat, lng)
+                },
+                createVoiceNoteFn = { id, sessionId, audioFilename, durationSeconds, createdAt, lat, lng ->
+                    get<NoteRepository>().createVoiceNote(
+                        id, sessionId, audioFilename, durationSeconds, createdAt, lat, lng,
+                    )
+                },
+                completeSessionFn = { id, endTime ->
+                    get<SessionRepository>().completeSession(id, endTime)
+                },
+                // ACTION_STOP is handled in LocationTrackingService.onStartCommand, which then
+                // calls stopSelf(). We send via startService (not startForegroundService) because
+                // the service already exists; we are just delivering a command, not starting it.
+                stopServiceFn = {
+                    val intent = Intent(ctx, LocationTrackingService::class.java).apply {
+                        action = LocationTrackingService.ACTION_STOP
+                    }
+                    ctx.startService(intent)
+                },
+
+                // ── Platform ─────────────────────────────────────────────────────────
+                audioRecorder = get(),
+            )
         )
     }
 }

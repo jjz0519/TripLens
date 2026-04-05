@@ -236,6 +236,8 @@ class RecordingViewModel(private val deps: RecordingDeps) : ViewModel() {
                 deps.completeSessionFn(sessionId, deps.clock())
                 deps.stopServiceFn()
             }
+            // Reset to Idle so the screen renders a clean state while navigation is in flight.
+            _uiState.value = UiState.Idle
             Log.i(TAG, "Session completed and service stopped sessionId=$sessionId")
             _events.send(Event.NavigateToSessionReview(sessionId))
         }
