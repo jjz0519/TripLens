@@ -28,7 +28,7 @@ data class RecordingDeps(
     val createGroupFn: (id: String, name: String, now: Long) -> Unit,
     val createSessionFn: (id: String, groupId: String, name: String, startTime: Long) -> Unit,
     /** Must use ContextCompat.startForegroundService on API 26+. */
-    val startService: (sessionId: String, profile: AccuracyProfile) -> Unit,
+    val startService: (sessionId: String, profile: AccuracyProfile, sessionStartTime: Long) -> Unit,
 
     // ── Active state — data fetching (polled every 5 s) ──────────────────────────
 

@@ -1,6 +1,7 @@
 package com.cooldog.triplens.ui.recording
 
 import android.Manifest
+import android.util.Log
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -38,8 +39,13 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.navigation.NavHostController
 import com.cooldog.triplens.navigation.SessionReviewRoute
-import com.cooldog.triplens.navigation.SettingsRoute
 import com.cooldog.triplens.ui.AppViewModel
+import com.google.android.gms.location.LocationServices
+import org.maplibre.android.camera.CameraUpdateFactory
+import org.maplibre.android.geometry.LatLng
+import org.maplibre.android.location.LocationComponentActivationOptions
+import org.maplibre.android.location.modes.CameraMode
+import org.maplibre.android.location.modes.RenderMode
 import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.MapView
 
@@ -99,6 +105,51 @@ fun RecordingScreen(
     // mapLibreMap is null until the tile style finishes loading. Set in the getMapAsync
     // callback below; passed to RecordingActiveContent so it can add the GeoJSON layers.
     var mapLibreMap by remember { mutableStateOf<MapLibreMap?>(null) }
+
+    // Runs once when the tile style finishes loading (mapLibreMap becomes non-null).
+    // 1. Zoom to last known location so the user sees their neighbourhood, not the world.
+    // 2. Activate the blue GPS dot so it is visible in both idle and active recording states.
+    //    RecordingActiveContent does NOT re-activate; it only adds the route layer.
+    LaunchedEffect(mapLibreMap) {
+        val map = mapLibreMap ?: return@LaunchedEffect
+
+        // ── Initial zoom ──────────────────────────────────────────────────────────
+        // FusedLocationProviderClient.lastLocation returns a cached fix with no extra
+        // battery cost. Falls back silently when permission is missing or no fix is cached.
+        try {
+            LocationServices.getFusedLocationProviderClient(context)
+                .lastLocation
+                .addOnSuccessListener { location ->
+                    if (location != null) {
+                        map.animateCamera(
+                            CameraUpdateFactory.newLatLngZoom(
+                                LatLng(location.latitude, location.longitude),
+                                15.0,  // ~streets level, ~200 m visible
+                            )
+                        )
+                    }
+                }
+        } catch (e: SecurityException) {
+            Log.w("TripLens/RecordingScreen", "No last location for initial zoom: ${e.message}")
+        }
+
+        // ── Location component (blue GPS dot + accuracy ring) ─────────────────────
+        // Activated unconditionally so the dot shows even before recording starts.
+        // CameraMode.NONE: we manage camera position manually (initial zoom above +
+        // the follow logic in RecordingActiveContent) rather than letting the component
+        // drive it, which allows the user to freely pan and re-centre.
+        map.getStyle { style ->
+            val lc = map.locationComponent
+            if (!lc.isLocationComponentActivated) {
+                lc.activateLocationComponent(
+                    LocationComponentActivationOptions.builder(context, style).build()
+                )
+            }
+            lc.isLocationComponentEnabled = true
+            lc.cameraMode = CameraMode.NONE
+            lc.renderMode = RenderMode.COMPASS
+        }
+    }
 
     // Create MapView once; onCreate(null) is acceptable — we don't need to restore camera state.
     val mapView = remember { MapView(context).apply { onCreate(null) } }
@@ -256,7 +307,6 @@ fun RecordingScreen(
                     ) == PermissionChecker.PERMISSION_GRANTED
                     viewModel.onStartTapped(locationGranted)
                 },
-                onSettingsTapped = { navController.navigate(SettingsRoute) },
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(0.4f),

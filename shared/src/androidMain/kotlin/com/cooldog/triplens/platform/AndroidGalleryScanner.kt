@@ -62,9 +62,13 @@ class AndroidGalleryScanner(private val context: Context) : GalleryScanner {
             // Sort chronologically so the caller can process events in capture order.
             results.sortBy { it.capturedAt }
 
-            // Advance the internal cursor to prevent re-returning these items next scan.
+            // Advance the cursor — but subtract 1 ms from the newest capturedAt so that
+            // items with the exact same DATE_TAKEN as the newest result are re-checked on
+            // the next scan. This catches videos that were IS_PENDING=1 at scan time (still
+            // being written by the camera) but share a capturedAt with an already-saved photo.
+            // insertIfNotExists() deduplicates any items we re-encounter.
             results.maxOfOrNull { it.capturedAt }?.let { newest ->
-                lastScanTimestamp = maxOf(lastScanTimestamp, newest)
+                lastScanTimestamp = maxOf(lastScanTimestamp, newest - 1)
             }
 
             Log.i(TAG, "scanNewMedia done: ${results.size} items returned " +

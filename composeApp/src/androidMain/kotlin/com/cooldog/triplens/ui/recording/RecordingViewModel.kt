@@ -170,7 +170,7 @@ class RecordingViewModel(private val deps: RecordingDeps) : ViewModel() {
                 deps.createSessionFn(sessionId, groupId, "Session 1", now)
                 Log.d(TAG, "Created Session id=$sessionId groupId=$groupId")
 
-                deps.startService(sessionId, AccuracyProfile.STANDARD)
+                deps.startService(sessionId, AccuracyProfile.STANDARD, now)
                 Log.i(TAG, "LocationTrackingService started sessionId=$sessionId profile=STANDARD")
 
                 // Transition to active state before returning to the main dispatcher.
@@ -444,9 +444,12 @@ class RecordingViewModel(private val deps: RecordingDeps) : ViewModel() {
                 )
             }
         }
+        // Sort oldest-first so the grid displays chronologically (upper-left = earliest).
+        // takeLast keeps the MEDIA_STRIP_MAX newest items from the oldest-first list,
+        // so the displayed set is always the most recent events.
         return (fromRefs + fromNotes)
-            .sortedByDescending { it.capturedAt }
-            .take(MEDIA_STRIP_MAX)
+            .sortedBy { it.capturedAt }
+            .takeLast(MEDIA_STRIP_MAX)
     }
 
     /**

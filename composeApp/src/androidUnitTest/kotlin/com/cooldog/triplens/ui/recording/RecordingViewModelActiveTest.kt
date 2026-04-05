@@ -118,7 +118,7 @@ class RecordingViewModelActiveTest {
         RecordingDeps(
             createGroupFn      = { _, _, _ -> },
             createSessionFn    = { _, _, _, _ -> },
-            startService       = { _, _ -> },
+            startService       = { _, _, _ -> },
             getTrackPointsFn   = { fakeTrackPoints },
             getMediaRefsFn     = { fakeMediaRefs },
             getNotesFn         = { fakeNotes },

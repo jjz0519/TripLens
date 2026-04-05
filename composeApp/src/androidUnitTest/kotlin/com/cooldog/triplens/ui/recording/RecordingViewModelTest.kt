@@ -70,7 +70,7 @@ class RecordingViewModelTest {
                 capturedSessionName      = name
                 capturedSessionStartTime = startTime
             },
-            startService     = { sessionId, profile ->
+            startService     = { sessionId, profile, _ ->
                 capturedServiceSessionId = sessionId
                 capturedServiceProfile   = profile
             },

@@ -10,6 +10,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -19,8 +21,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
+
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -46,16 +49,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
-import org.maplibre.android.location.LocationComponentActivationOptions
-import org.maplibre.android.location.modes.CameraMode
-import org.maplibre.android.location.modes.RenderMode
 import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.style.expressions.Expression
 import org.maplibre.android.style.layers.LineLayer
@@ -199,6 +198,7 @@ internal fun RecordingActiveTopBar(
  * @param onMapPanned        Disables camera auto-follow — called by the gesture listener.
  * @param onRecenterTapped   Re-enables camera auto-follow — bound to the Re-center button.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun RecordingActiveContent(
     state: RecordingViewModel.UiState.ActiveRecording,
@@ -210,8 +210,6 @@ internal fun RecordingActiveContent(
     onRecenterTapped: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val context = LocalContext.current
-
     // ── Map side-effect 1: one-time layer setup ────────────────────────────────────
     //
     // Runs when mapLibreMap first becomes non-null (style loaded). Guards with null checks
@@ -240,17 +238,8 @@ internal fun RecordingActiveContent(
             // for the next 5-second poll cycle.
             (style.getSource("route-source") as? GeoJsonSource)
                 ?.setGeoJson(MapGeoJsonBuilder.buildRouteFeatureCollection(state.trackPoints))
-
-            // Blue GPS dot + accuracy circle. CameraMode.NONE: we animate the camera
-            // manually in the trackPoints LaunchedEffect rather than letting the
-            // LocationComponent move it, which allows the user to pan away and re-center.
-            val lc = map.locationComponent
-            lc.activateLocationComponent(
-                LocationComponentActivationOptions.builder(context, style).build()
-            )
-            lc.isLocationComponentEnabled = true
-            lc.cameraMode = CameraMode.NONE
-            lc.renderMode = RenderMode.COMPASS
+            // Note: LocationComponent is activated in RecordingScreen.LaunchedEffect(mapLibreMap)
+            // so it is available in both idle and active states. No setup needed here.
         }
     }
 
@@ -268,9 +257,17 @@ internal fun RecordingActiveContent(
         if (state.isCameraFollowing) {
             val lastPoint = state.trackPoints.lastOrNull { !it.isAutoPaused }
             if (lastPoint != null) {
-                map.animateCamera(
-                    CameraUpdateFactory.newLatLng(LatLng(lastPoint.latitude, lastPoint.longitude))
-                )
+                val latLng = LatLng(lastPoint.latitude, lastPoint.longitude)
+                // If the map is still at a distant zoom (e.g. world view because no lastLocation
+                // was available before recording started), snap to streets level on the first fix.
+                // Otherwise preserve the user's current zoom so panning-and-re-centering feels
+                // natural and doesn't forcibly zoom back in.
+                val update = if (map.cameraPosition.zoom < 10.0) {
+                    CameraUpdateFactory.newLatLngZoom(latLng, 15.0)
+                } else {
+                    CameraUpdateFactory.newLatLng(latLng)
+                }
+                map.animateCamera(update)
             }
         }
     }
@@ -337,7 +334,9 @@ internal fun RecordingActiveContent(
 
         Spacer(Modifier.height(8.dp))
 
-        // ── Media strip ────────────────────────────────────────────────────────────
+        // ── Media grid ─────────────────────────────────────────────────────────────
+        // Items flow left-to-right then wrap to the next row (oldest at upper-left).
+        // verticalScroll lets overflow rows scroll without needing a fixed row count.
         if (state.recentMedia.isEmpty()) {
             Text(
                 text = "Photos, videos, and notes appear here",
@@ -346,11 +345,15 @@ internal fun RecordingActiveContent(
                 modifier = Modifier.padding(horizontal = 16.dp),
             )
         } else {
-            LazyRow(
-                contentPadding = PaddingValues(horizontal = 16.dp),
+            FlowRow(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                items(state.recentMedia, key = { it.id }) { item ->
+                state.recentMedia.forEach { item ->
                     MediaStripItem(item)
                 }
             }

@@ -8,6 +8,8 @@ import com.cooldog.triplens.di.androidModule
 import com.cooldog.triplens.di.sharedModule
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.context.startKoin
+import org.maplibre.android.MapLibre
+import org.maplibre.android.WellKnownTileServer
 
 private const val TAG = "TripLens/Application"
 
@@ -35,6 +37,11 @@ class TripLensApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         Log.i(TAG, "onCreate: starting Koin and creating notification channel")
+
+        // MapLibre requires a one-time getInstance() call before any MapView is created.
+        // An empty API key is correct for OpenFreeMap (no key required).
+        // WellKnownTileServer.MapLibre matches the tile URL format we use.
+        MapLibre.getInstance(this, "", WellKnownTileServer.MapLibre)
 
         startKoin {
             androidContext(this@TripLensApplication)

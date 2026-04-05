@@ -4,6 +4,7 @@ import android.Manifest
 import android.app.Activity
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -19,6 +20,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Photo
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
@@ -134,6 +136,15 @@ fun OnboardingScreen(
             title = "Photos & Media",
             description = "To auto-index photos taken during your trip",
         )
+        // POST_NOTIFICATIONS is only a runtime permission on Android 13+ (API 33).
+        // On older versions it is granted automatically with no dialog needed.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            PermissionRow(
+                icon = Icons.Default.Notifications,
+                title = "Notifications",
+                description = "To show the live recording status notification",
+            )
+        }
 
         Spacer(modifier = Modifier.height(40.dp))
 
@@ -159,15 +170,18 @@ fun OnboardingScreen(
         } else {
             Button(
                 onClick = {
-                    mainPermissionsLauncher.launch(
-                        arrayOf(
-                            Manifest.permission.ACCESS_FINE_LOCATION,
-                            Manifest.permission.ACCESS_COARSE_LOCATION,
-                            Manifest.permission.RECORD_AUDIO,
-                            Manifest.permission.READ_MEDIA_IMAGES,
-                            Manifest.permission.ACCESS_MEDIA_LOCATION,
-                        )
-                    )
+                    val permissions = buildList {
+                        add(Manifest.permission.ACCESS_FINE_LOCATION)
+                        add(Manifest.permission.ACCESS_COARSE_LOCATION)
+                        add(Manifest.permission.RECORD_AUDIO)
+                        add(Manifest.permission.READ_MEDIA_IMAGES)
+                        add(Manifest.permission.ACCESS_MEDIA_LOCATION)
+                        // POST_NOTIFICATIONS only exists as a runtime permission on API 33+.
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                            add(Manifest.permission.POST_NOTIFICATIONS)
+                        }
+                    }
+                    mainPermissionsLauncher.launch(permissions.toTypedArray())
                 },
                 modifier = Modifier.fillMaxWidth(),
             ) {

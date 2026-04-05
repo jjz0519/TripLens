@@ -1,5 +1,6 @@
 package com.cooldog.triplens.service
 
+import android.app.NotificationManager
 import android.app.Service
 import android.content.Context
 import android.content.Intent
@@ -9,25 +10,41 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.cooldog.triplens.RECORDING_CHANNEL_ID
 import com.cooldog.triplens.domain.TransportClassifier
+import com.cooldog.triplens.model.MediaType
+import com.cooldog.triplens.model.NoteType
 import com.cooldog.triplens.platform.AccuracyProfile
+import com.cooldog.triplens.platform.AndroidGalleryScanner
+import com.cooldog.triplens.platform.GalleryScanner
 import com.cooldog.triplens.platform.LocationData
 import com.cooldog.triplens.platform.LocationProvider
+import com.cooldog.triplens.repository.MediaRefRepository
+import com.cooldog.triplens.repository.NoteRepository
 import com.cooldog.triplens.repository.TrackPointInsert
 import com.cooldog.triplens.repository.TrackPointRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject
+import java.util.UUID
+import kotlin.math.atan2
+import kotlin.math.cos
+import kotlin.math.pow
+import kotlin.math.sin
+import kotlin.math.sqrt
 
 private const val TAG = "TripLens/LocationService"
 
-private const val NOTIFICATION_ID = 1001
-private const val PREFS_NAME      = "triplens_service"
-private const val PREFS_SESSION_ID = "active_session_id"
-private const val PREFS_PROFILE    = "accuracy_profile"
-private const val BUFFER_FLUSH_SIZE = 10
+private const val NOTIFICATION_ID         = 1001
+private const val PREFS_NAME              = "triplens_service"
+private const val PREFS_SESSION_ID        = "active_session_id"
+private const val PREFS_PROFILE           = "accuracy_profile"
+private const val PREFS_SESSION_START_TIME = "session_start_time"
+private const val BUFFER_FLUSH_SIZE       = 10
 
 // Auto-pause: enter after this many consecutive milliseconds below STATIONARY_SPEED_KMH.
 private const val AUTO_PAUSE_THRESHOLD_MS = 3 * 60 * 60 * 1000L  // 3 hours
@@ -35,18 +52,21 @@ private const val AUTO_PAUSE_THRESHOLD_MS = 3 * 60 * 60 * 1000L  // 3 hours
 private const val AUTO_PAUSE_INTERVAL_MS  = 5 * 60 * 1000L       // 5 minutes
 // Speed below which the device is considered stationary.
 private const val STATIONARY_SPEED_KMH   = 1.0f
+// Gallery scan interval. TDD §5.1 says 60 s; we use 15 s so photos/videos appear quickly.
+private const val GALLERY_SCAN_INTERVAL_MS = 15_000L
 
 /**
  * ForegroundService that owns the GPS recording lifecycle.
  *
  * ## Intent API
- * Start recording:  ACTION_START with extras session_id (String) + accuracy_profile (String)
+ * Start recording:  ACTION_START with extras session_id (String), accuracy_profile (String),
+ *                   session_start_time (Long, epoch ms)
  * Stop recording:   ACTION_STOP  (no extras needed)
  *
  * ## Recovery (START_STICKY)
  * On a system restart the OS delivers onStartCommand with a null intent. The service reads
- * session_id and accuracy_profile from SharedPreferences written at start time so recording
- * resumes automatically after a forced kill.
+ * session_id, accuracy_profile, and session_start_time from SharedPreferences written at start
+ * time so recording resumes automatically after a forced kill.
  *
  * ## Auto-pause
  * After 3h stationary (speed < 1 km/h), the service switches to one fix every 5 minutes
@@ -56,28 +76,39 @@ private const val STATIONARY_SPEED_KMH   = 1.0f
  * ## Buffer
  * Points are buffered in an ArrayDeque and flushed in a single DB transaction every 10
  * points, or immediately on ACTION_STOP to prevent data loss.
+ *
+ * ## Gallery scanning
+ * Every [GALLERY_SCAN_INTERVAL_MS] (60 s) a coroutine queries MediaStore for new photos/videos
+ * taken since [sessionStartTime] and inserts them into [MediaRefRepository]. Deduplication
+ * by content_uri is enforced by [MediaRefRepository.insertIfNotExists].
+ *
+ * ## Live notification
+ * The foreground notification shows distance, photo, video, text-note, and voice-note counts.
+ * It is refreshed after every buffer flush and every gallery scan so counts stay current
+ * without excessive DB queries.
  */
 class LocationTrackingService : Service() {
 
     // --- Dependencies injected by Koin ---
-    // by inject() is the KoinComponent delegate for Android framework classes (Service,
-    // Activity, etc.) where constructor injection is not possible. Koin resolves these
-    // from the graph started in TripLensApplication.onCreate(), which is guaranteed to
-    // run before any Service is created.
     private val trackPointRepo: TrackPointRepository by inject()
+    private val mediaRefRepo:   MediaRefRepository   by inject()
+    private val noteRepo:       NoteRepository       by inject()
     private val locationProvider: LocationProvider   by inject()
+    private val galleryScanner: GalleryScanner       by inject()
 
     private lateinit var prefs: SharedPreferences
 
     // --- Session state ---
-    private var currentSessionId: String? = null
+    private var currentSessionId: String?     = null
     private var currentProfile: AccuracyProfile = AccuracyProfile.STANDARD
+    private var sessionStartTime: Long          = 0L
 
     // --- Buffering ---
     private val buffer = ArrayDeque<TrackPointInsert>()
 
-    // --- Coroutine scope for IO work (buffer flush). Cancelled in onDestroy. ---
+    // --- Coroutine scope for IO work (buffer flush, gallery scan). Cancelled in onDestroy. ---
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private var galleryScanJob: Job? = null
 
     // --- Auto-pause state ---
     private var isAutoPaused: Boolean = false
@@ -88,6 +119,14 @@ class LocationTrackingService : Service() {
     // Set when speed first drops below threshold; cleared on movement.
     private var stationaryStartMs: Long? = null
 
+    // --- Distance tracking ---
+    // Accumulated haversine distance across all non-auto-paused GPS fixes in this session.
+    // Updated incrementally so we never need a full DB scan to compute distance for the
+    // notification. Resets to 0 when a new session starts.
+    private var cumulativeDistanceMeters: Double = 0.0
+    private var prevLat: Double? = null
+    private var prevLng: Double? = null
+
     // -------------------------------------------------------------------------
     // Lifecycle
     // -------------------------------------------------------------------------
@@ -96,13 +135,7 @@ class LocationTrackingService : Service() {
         super.onCreate()
         runningInstance = this
         Log.i(TAG, "onCreate")
-
-        // SharedPreferences is not in Koin — it is a low-level Android primitive that
-        // doesn't benefit from DI and its key constants belong in this class.
         prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-
-        // Notification channel was created in TripLensApplication.onCreate().
-        // No setup required here.
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -110,10 +143,11 @@ class LocationTrackingService : Service() {
 
         when (intent?.action) {
             ACTION_START -> {
-                val sessionId = intent.getStringExtra(EXTRA_SESSION_ID)
+                val sessionId  = intent.getStringExtra(EXTRA_SESSION_ID)
                 val profileName = intent.getStringExtra(EXTRA_ACCURACY_PROFILE)
                     ?: AccuracyProfile.STANDARD.name
-                startRecording(sessionId, profileName)
+                val startTime  = intent.getLongExtra(EXTRA_SESSION_START_TIME, System.currentTimeMillis())
+                startRecording(sessionId, profileName, startTime)
             }
             ACTION_STOP -> {
                 stopRecording()
@@ -121,16 +155,17 @@ class LocationTrackingService : Service() {
             }
             null -> {
                 // System restart: recover from SharedPreferences.
-                val sessionId = prefs.getString(PREFS_SESSION_ID, null)
+                val sessionId   = prefs.getString(PREFS_SESSION_ID, null)
                 val profileName = prefs.getString(PREFS_PROFILE, AccuracyProfile.STANDARD.name)
                     ?: AccuracyProfile.STANDARD.name
+                val startTime   = prefs.getLong(PREFS_SESSION_START_TIME, System.currentTimeMillis())
                 if (sessionId == null) {
                     Log.w(TAG, "Null intent with no saved session — stopping service")
                     stopSelf()
                     return START_NOT_STICKY
                 }
                 Log.i(TAG, "Recovering session $sessionId from SharedPreferences")
-                startRecording(sessionId, profileName)
+                startRecording(sessionId, profileName, startTime)
             }
             else -> Log.w(TAG, "Unknown action: ${intent?.action}")
         }
@@ -152,7 +187,7 @@ class LocationTrackingService : Service() {
     // Recording control
     // -------------------------------------------------------------------------
 
-    private fun startRecording(sessionId: String?, profileName: String) {
+    private fun startRecording(sessionId: String?, profileName: String, startTime: Long) {
         if (sessionId == null) {
             Log.e(TAG, "Cannot start recording: sessionId is null")
             stopSelf()
@@ -160,41 +195,52 @@ class LocationTrackingService : Service() {
         }
 
         currentSessionId = sessionId
+        sessionStartTime = startTime
         currentProfile   = runCatching { AccuracyProfile.valueOf(profileName) }
             .getOrElse {
                 Log.w(TAG, "Unknown profile '$profileName', falling back to STANDARD")
                 AccuracyProfile.STANDARD
             }
 
+        // Reset per-session distance tracking.
+        cumulativeDistanceMeters = 0.0
+        prevLat = null
+        prevLng = null
+
         // Persist for START_STICKY recovery.
         prefs.edit()
             .putString(PREFS_SESSION_ID, sessionId)
             .putString(PREFS_PROFILE, currentProfile.name)
+            .putLong(PREFS_SESSION_START_TIME, sessionStartTime)
             .apply()
 
-        Log.i(TAG, "Starting recording: session=$sessionId, profile=$currentProfile")
+        Log.i(TAG, "Starting recording: session=$sessionId, profile=$currentProfile, " +
+                "startTime=$sessionStartTime")
 
         startForeground(NOTIFICATION_ID, buildNotification())
 
         locationProvider.startUpdates(
-            intervalMs  = currentProfile.movingIntervalMs,
-            priority    = currentProfile.priority,
-            onLocation  = ::onLocationReceived
+            intervalMs = currentProfile.movingIntervalMs,
+            priority   = currentProfile.priority,
+            onLocation = ::onLocationReceived
         )
+
+        startGalleryScanLoop()
     }
 
     private fun stopRecording() {
         Log.i(TAG, "Stopping recording: session=$currentSessionId")
 
-        locationProvider.stopUpdates()
+        galleryScanJob?.cancel()
+        galleryScanJob = null
 
-        // Flush any remaining buffered points before stopping.
+        locationProvider.stopUpdates()
         flushBuffer()
 
-        // Clear recovery prefs.
         prefs.edit()
             .remove(PREFS_SESSION_ID)
             .remove(PREFS_PROFILE)
+            .remove(PREFS_SESSION_START_TIME)
             .apply()
 
         stopForeground(STOP_FOREGROUND_REMOVE)
@@ -233,6 +279,18 @@ class LocationTrackingService : Service() {
             }
         }
 
+        // --- Incremental distance ---
+        // Only accumulate distance for non-paused fixes so auto-pause gaps don't inflate stats.
+        if (!isAutoPaused) {
+            val prev = prevLat
+            val prevL = prevLng
+            if (prev != null && prevL != null) {
+                cumulativeDistanceMeters += haversineMeters(prev, prevL, data.latitude, data.longitude)
+            }
+            prevLat = data.latitude
+            prevLng = data.longitude
+        }
+
         val point = TrackPointInsert(
             sessionId     = sessionId,
             timestamp     = data.timestampMs,
@@ -252,16 +310,11 @@ class LocationTrackingService : Service() {
             flushBuffer()
         }
 
-        // Adjust interval based on movement if not in auto-pause.
-        // Skip when GPS is disabled for testing (isGpsStoppedForTest) to prevent
-        // injected fixes from re-enabling the real FusedLocationProviderClient.
         if (!isAutoPaused && !isGpsStoppedForTest) {
             val desiredInterval = if (speedKmh >= STATIONARY_SPEED_KMH)
                 currentProfile.movingIntervalMs
             else
                 currentProfile.stationaryIntervalMs
-            // Note: LocationProvider doesn't expose the active interval, so we re-apply
-            // on every fix. The FusedClient de-duplicates identical requests internally.
             locationProvider.startUpdates(desiredInterval, currentProfile.priority, ::onLocationReceived)
         }
     }
@@ -270,10 +323,6 @@ class LocationTrackingService : Service() {
     // Auto-pause transitions
     // -------------------------------------------------------------------------
 
-    /**
-     * Enters auto-pause mode: switches to 5-minute fix interval and marks
-     * subsequent points with isAutoPaused=true.
-     */
     private fun enterAutoPause() {
         isAutoPaused = true
         Log.i(TAG, "Entering auto-pause: switching to ${AUTO_PAUSE_INTERVAL_MS}ms interval")
@@ -282,9 +331,6 @@ class LocationTrackingService : Service() {
         }
     }
 
-    /**
-     * Exits auto-pause mode: restores the profile's moving interval.
-     */
     private fun exitAutoPause() {
         isAutoPaused = false
         stationaryStartMs = null
@@ -300,7 +346,7 @@ class LocationTrackingService : Service() {
 
     /**
      * Flushes all buffered [TrackPointInsert] records to the database in a single
-     * transaction. Called when the buffer hits [BUFFER_FLUSH_SIZE] or on service stop.
+     * transaction, then refreshes the foreground notification with latest stats.
      */
     private fun flushBuffer() {
         if (buffer.isEmpty()) return
@@ -314,6 +360,62 @@ class LocationTrackingService : Service() {
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to flush ${toFlush.size} points", e)
             }
+            // Refresh notification after flush regardless of flush success — distance
+            // is tracked in-memory so it is always accurate even if the DB write failed.
+            updateNotification()
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Gallery scanning
+    // -------------------------------------------------------------------------
+
+    /**
+     * Launches a repeating coroutine that scans MediaStore for new photos/videos
+     * every [GALLERY_SCAN_INTERVAL_MS] and inserts them into [MediaRefRepository].
+     *
+     * The first scan is intentionally delayed by one interval so it runs after the
+     * user has had a chance to take a photo; an immediate scan on session start would
+     * almost always return zero results.
+     *
+     * Deduplication is enforced by [MediaRefRepository.insertIfNotExists] so restarted
+     * sessions (START_STICKY recovery) cannot create duplicate rows.
+     */
+    private fun startGalleryScanLoop() {
+        galleryScanJob = serviceScope.launch {
+            while (isActive) {
+                delay(GALLERY_SCAN_INTERVAL_MS)
+                runGalleryScan()
+            }
+        }
+        Log.i(TAG, "Gallery scan loop started (interval=${GALLERY_SCAN_INTERVAL_MS}ms)")
+    }
+
+    private suspend fun runGalleryScan() {
+        val sessionId = currentSessionId ?: return
+        try {
+            val scanned = galleryScanner.scanNewMedia(sessionStartTime)
+            if (scanned.isEmpty()) {
+                Log.d(TAG, "Gallery scan: no new media")
+                return
+            }
+            for (media in scanned) {
+                mediaRefRepo.insertIfNotExists(
+                    id         = UUID.randomUUID().toString(),
+                    sessionId  = sessionId,
+                    type       = media.mediaType.name.lowercase(),
+                    source     = "phone_gallery",
+                    contentUri = media.contentUri,
+                    filename   = media.filename,
+                    capturedAt = media.capturedAt,
+                )
+            }
+            Log.i(TAG, "Gallery scan: inserted ${scanned.size} new items " +
+                    "(${scanned.count { it.mediaType == MediaType.PHOTO }} photos, " +
+                    "${scanned.count { it.mediaType == MediaType.VIDEO }} videos)")
+            updateNotification()
+        } catch (e: Exception) {
+            Log.e(TAG, "Gallery scan failed", e)
         }
     }
 
@@ -321,59 +423,143 @@ class LocationTrackingService : Service() {
     // Notification
     // -------------------------------------------------------------------------
 
-    private fun buildNotification() = NotificationCompat.Builder(this, RECORDING_CHANNEL_ID)
+    /**
+     * Queries the DB for current media/note counts and posts an updated notification.
+     * Called after every buffer flush and gallery scan — at most once per ~60 s during
+     * normal movement, so the DB query cost is negligible.
+     *
+     * Must be called from within [serviceScope] (already on IO thread).
+     */
+    private suspend fun updateNotification() {
+        val sessionId = currentSessionId ?: return
+        try {
+            val mediaRefs   = mediaRefRepo.getBySession(sessionId)
+            val photoCount  = mediaRefs.count { it.type == MediaType.PHOTO }
+            val videoCount  = mediaRefs.count { it.type == MediaType.VIDEO }
+            val notes       = noteRepo.getBySession(sessionId)
+            val textCount   = notes.count { it.type == NoteType.TEXT }
+            val voiceCount  = notes.count { it.type == NoteType.VOICE }
+
+            val notification = buildNotification(
+                distanceMeters = cumulativeDistanceMeters,
+                photoCount     = photoCount,
+                videoCount     = videoCount,
+                textCount      = textCount,
+                voiceCount     = voiceCount,
+            )
+            getSystemService(NotificationManager::class.java)
+                .notify(NOTIFICATION_ID, notification)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to update notification stats", e)
+        }
+    }
+
+    /**
+     * Builds the foreground notification.
+     *
+     * Content line format (non-zero counts only):
+     *   "1.2 km  •  3 photos  •  2 notes  •  1 voice"
+     * When nothing has been recorded yet the content text is "Starting…"
+     */
+    private fun buildNotification(
+        distanceMeters: Double = 0.0,
+        photoCount:     Int    = 0,
+        videoCount:     Int    = 0,
+        textCount:      Int    = 0,
+        voiceCount:     Int    = 0,
+    ) = NotificationCompat.Builder(this, RECORDING_CHANNEL_ID)
         .setContentTitle("TripLens is recording")
+        .setContentText(buildStatsLine(distanceMeters, photoCount, videoCount, textCount, voiceCount))
         .setSmallIcon(android.R.drawable.ic_menu_mylocation)
-        // No action buttons in MVP — stop is handled from the in-app UI.
         .setOngoing(true)
+        // Allow the OS to show the full text on lock screen / expanded shade.
+        .setStyle(NotificationCompat.BigTextStyle()
+            .bigText(buildStatsLine(distanceMeters, photoCount, videoCount, textCount, voiceCount)))
         .build()
 
+    /**
+     * Formats the notification stats line.
+     *
+     * Distance is shown as metres below 1 km ("800 m") and kilometres above ("1.2 km").
+     * Counts use "1 photo" / "2 photos" pluralisation for clarity.
+     * Returns "Starting…" until the first GPS fix arrives (distanceMeters == 0 and all counts == 0).
+     */
+    private fun buildStatsLine(
+        distanceMeters: Double,
+        photoCount: Int,
+        videoCount: Int,
+        textCount:  Int,
+        voiceCount: Int,
+    ): String {
+        if (distanceMeters == 0.0 && photoCount == 0 && videoCount == 0
+            && textCount == 0 && voiceCount == 0) {
+            return "Starting…"
+        }
+        return buildString {
+            val dist = if (distanceMeters < 1000) {
+                "${distanceMeters.toInt()} m"
+            } else {
+                "${"%.1f".format(distanceMeters / 1000)} km"
+            }
+            append(dist)
+            if (photoCount > 0) append("  •  $photoCount ${if (photoCount == 1) "photo" else "photos"}")
+            if (videoCount > 0) append("  •  $videoCount ${if (videoCount == 1) "video" else "videos"}")
+            if (textCount  > 0) append("  •  $textCount ${if (textCount  == 1) "note"  else "notes"}")
+            if (voiceCount > 0) append("  •  $voiceCount voice")
+        }
+    }
+
     // -------------------------------------------------------------------------
-    // Companion — Intent API
+    // Distance helper
     // -------------------------------------------------------------------------
+
+    /**
+     * Haversine distance in metres between two WGS-84 coordinates.
+     * Duplicated from [com.cooldog.triplens.domain.SegmentSmoother] (private there) to
+     * avoid a cross-module dependency for a 6-line math function.
+     */
+    private fun haversineMeters(lat1: Double, lng1: Double, lat2: Double, lng2: Double): Double {
+        val r  = 6_371_000.0
+        val φ1 = Math.toRadians(lat1)
+        val φ2 = Math.toRadians(lat2)
+        val Δφ = Math.toRadians(lat2 - lat1)
+        val Δλ = Math.toRadians(lng2 - lng1)
+        val a  = sin(Δφ / 2).pow(2) + cos(φ1) * cos(φ2) * sin(Δλ / 2).pow(2)
+        return r * 2 * atan2(sqrt(a), sqrt(1 - a))
+    }
 
     // -------------------------------------------------------------------------
     // Test hooks — package-private; only used by instrumented tests
     // -------------------------------------------------------------------------
 
-    /** Feeds a [LocationData] fix directly into the location callback. Used by tests
-     *  to simulate GPS fixes without a real FusedLocationProviderClient. */
     internal fun onLocationReceivedForTest(data: LocationData) = onLocationReceived(data)
-
-    /** Exposes [isAutoPaused] state for assertion in instrumented tests. */
     internal fun isAutoPausedForTest(): Boolean = isAutoPaused
 
-    /**
-     * Stops real GPS delivery and prevents any code path from restarting it, so
-     * synthetic [LocationData] can be injected without interference. Call this
-     * immediately after [startService] in tests that inject fixes directly.
-     */
     internal fun stopGpsForTest() {
         isGpsStoppedForTest = true
         locationProvider.stopUpdates()
     }
 
-    /**
-     * Resets stationary-tracking state and clears the point buffer to a clean baseline.
-     * Call after [stopGpsForTest] to prevent real GPS fixes delivered between service
-     * start and GPS stop from pre-seeding [stationaryStartMs] or polluting the buffer.
-     */
     internal fun resetStationaryStateForTest() {
         stationaryStartMs = null
         isAutoPaused = false
         buffer.clear()
     }
 
+    // -------------------------------------------------------------------------
+    // Companion — Intent API
+    // -------------------------------------------------------------------------
+
     companion object {
-        const val ACTION_START           = "com.cooldog.triplens.ACTION_START"
-        const val ACTION_STOP            = "com.cooldog.triplens.ACTION_STOP"
-        const val EXTRA_SESSION_ID       = "session_id"
-        const val EXTRA_ACCURACY_PROFILE = "accuracy_profile"
+        const val ACTION_START                = "com.cooldog.triplens.ACTION_START"
+        const val ACTION_STOP                 = "com.cooldog.triplens.ACTION_STOP"
+        const val EXTRA_SESSION_ID            = "session_id"
+        const val EXTRA_ACCURACY_PROFILE      = "accuracy_profile"
+        const val EXTRA_SESSION_START_TIME    = "session_start_time"
 
         /**
          * Set to the running service instance in [onCreate]; cleared in [onDestroy].
          * Enables tests to reach internal state without reflection or a Binder.
-         * Only valid while the service is running.
          */
         @Volatile
         internal var runningInstance: LocationTrackingService? = null

@@ -5,12 +5,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -26,7 +22,6 @@ import androidx.compose.ui.unit.dp
  * Layout:
  * ```
  * ┌─────────────────────────────┐
- * │                         ⚙️  │  ← gear icon, top-right → Settings
  * │                             │
  * │     ◉  Start Recording      │  ← 96 dp circular primary button (center)
  * │                             │
@@ -36,6 +31,9 @@ import androidx.compose.ui.unit.dp
  * The Start button is disabled and shows a loading indicator while
  * [RecordingViewModel.UiState.StartingSession] is active.
  *
+ * Settings are reachable via the bottom navigation bar — no need for a duplicate
+ * shortcut here that would complicate back-stack navigation.
+ *
  * Extracted from [RecordingScreen] so the active-state bottom panel can replace it cleanly
  * without nesting deeply inside a single composable.
  */
@@ -43,39 +41,32 @@ import androidx.compose.ui.unit.dp
 internal fun RecordingIdleContent(
     uiState: RecordingViewModel.UiState,
     onStartTapped: () -> Unit,
-    onSettingsTapped: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Box(
         modifier = modifier.padding(16.dp),
     ) {
-        // Gear icon — navigates to the Settings screen.
-        IconButton(
-            onClick = onSettingsTapped,
-            modifier = Modifier.align(Alignment.TopEnd),
-        ) {
-            Icon(Icons.Default.Settings, contentDescription = "Settings")
-        }
-
         // Start Recording button — large circle, centered in the panel.
+        // 160 dp (~2× the original 96 dp) is prominent enough to tap easily while recording
+        // without overflowing the 40 % bottom panel on compact phone screens.
         Button(
             onClick = onStartTapped,
             enabled = uiState == RecordingViewModel.UiState.Idle,
             shape   = CircleShape,
             modifier = Modifier
-                .size(96.dp)
+                .size(160.dp)
                 .align(Alignment.Center),
         ) {
             if (uiState == RecordingViewModel.UiState.StartingSession) {
                 CircularProgressIndicator(
-                    modifier    = Modifier.size(24.dp),
+                    modifier    = Modifier.size(32.dp),
                     color       = MaterialTheme.colorScheme.onPrimary,
-                    strokeWidth = 2.dp,
+                    strokeWidth = 3.dp,
                 )
             } else {
                 Text(
                     text      = "Start\nRecording",
-                    style     = MaterialTheme.typography.labelSmall,
+                    style     = MaterialTheme.typography.bodyMedium,
                     textAlign = TextAlign.Center,
                 )
             }

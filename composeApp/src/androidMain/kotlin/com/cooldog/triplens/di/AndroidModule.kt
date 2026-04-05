@@ -110,11 +110,12 @@ val androidModule = module {
                 },
                 // ContextCompat.startForegroundService is required on API 26+: plain
                 // startService() cannot promote a service to foreground on those versions.
-                startService = { sessionId, profile ->
+                startService = { sessionId, profile, sessionStartTime ->
                     val intent = Intent(ctx, LocationTrackingService::class.java).apply {
                         action = LocationTrackingService.ACTION_START
                         putExtra(LocationTrackingService.EXTRA_SESSION_ID, sessionId)
                         putExtra(LocationTrackingService.EXTRA_ACCURACY_PROFILE, profile.name)
+                        putExtra(LocationTrackingService.EXTRA_SESSION_START_TIME, sessionStartTime)
                     }
                     ContextCompat.startForegroundService(ctx, intent)
                 },
