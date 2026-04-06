@@ -175,6 +175,10 @@ fun OnboardingScreen(
                         add(Manifest.permission.ACCESS_COARSE_LOCATION)
                         add(Manifest.permission.RECORD_AUDIO)
                         add(Manifest.permission.READ_MEDIA_IMAGES)
+                        // READ_MEDIA_VIDEO is a separate runtime permission from READ_MEDIA_IMAGES
+                        // on API 33+. Without it, the video MediaStore query returns a null cursor
+                        // and the gallery scanner silently skips all MP4/video files.
+                        add(Manifest.permission.READ_MEDIA_VIDEO)
                         add(Manifest.permission.ACCESS_MEDIA_LOCATION)
                         // POST_NOTIFICATIONS only exists as a runtime permission on API 33+.
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
