@@ -2,6 +2,8 @@ package com.cooldog.triplens.ui.recording
 
 import android.Manifest
 import android.util.Log
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -101,6 +103,16 @@ fun RecordingScreen(
     var showRationaleDialog by remember { mutableStateOf(false) }
     var showStopDialog by remember { mutableStateOf(false) }
     var showTextNoteSheet by remember { mutableStateOf(false) }
+
+    // When the user scrolls down into the media list the panel expands to 70% of screen
+    // height; scrolling back to the top restores the default 40/60 split.
+    // animateFloatAsState smoothly interpolates so the transition feels physical, not jarring.
+    var isMediaExpanded by remember { mutableStateOf(false) }
+    val panelWeight by animateFloatAsState(
+        targetValue = if (isMediaExpanded) 0.7f else 0.4f,
+        animationSpec = tween(durationMillis = 300),
+        label = "panelWeight",
+    )
 
     // mapLibreMap is null until the tile style finishes loading. Set in the getMapAsync
     // callback below; passed to RecordingActiveContent so it can add the GeoJSON layers.
@@ -246,11 +258,12 @@ fun RecordingScreen(
 
     Column(modifier = Modifier.fillMaxSize()) {
 
-        // ── Map area (~60 % of screen height) ─────────────────────────────────────
+        // ── Map area: takes the complement of the panel weight ────────────────────
+        // 1f - panelWeight gives 0.6f at rest and 0.3f when the media list is expanded.
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .weight(0.6f),
+                .weight(1f - panelWeight),
         ) {
             AndroidView(
                 factory = {
@@ -283,7 +296,9 @@ fun RecordingScreen(
             }
         }
 
-        // ── Bottom panel (~40 % of screen height) ─────────────────────────────────
+        // ── Bottom panel ───────────────────────────────────────────────────────────
+        // Active: animated weight (0.4f ↔ 0.7f) driven by media list scroll position.
+        // Idle: fixed 0.4f — no media list, no expansion needed.
         if (activeState != null) {
             RecordingActiveContent(
                 state = activeState,
@@ -293,11 +308,14 @@ fun RecordingScreen(
                 onVoiceNoteStop = { viewModel.onVoiceNoteStop() },
                 onMapPanned = { viewModel.onMapPanned() },
                 onRecenterTapped = { viewModel.onRecenterTapped() },
+                onMediaScrollChanged = { isScrolledDown -> isMediaExpanded = isScrolledDown },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(0.4f),
+                    .weight(panelWeight),
             )
         } else {
+            // Reset expansion so the next recording session starts at the default ratio.
+            isMediaExpanded = false
             RecordingIdleContent(
                 uiState = uiState,
                 onStartTapped = {

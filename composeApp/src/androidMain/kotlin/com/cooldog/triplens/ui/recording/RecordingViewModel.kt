@@ -444,12 +444,10 @@ class RecordingViewModel(private val deps: RecordingDeps) : ViewModel() {
                 )
             }
         }
-        // Sort oldest-first so the grid displays chronologically (upper-left = earliest).
-        // takeLast keeps the MEDIA_STRIP_MAX newest items from the oldest-first list,
-        // so the displayed set is always the most recent events.
+        // Sort newest-first: the vertical list shows the most recent item at the top.
         return (fromRefs + fromNotes)
-            .sortedBy { it.capturedAt }
-            .takeLast(MEDIA_STRIP_MAX)
+            .sortedByDescending { it.capturedAt }
+            .take(MEDIA_STRIP_MAX)
     }
 
     /**

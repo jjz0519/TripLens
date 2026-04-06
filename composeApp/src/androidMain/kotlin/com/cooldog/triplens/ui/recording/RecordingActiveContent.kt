@@ -21,7 +21,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
@@ -35,6 +34,7 @@ import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -45,14 +45,23 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalContext
 import coil3.compose.AsyncImage
+import coil3.request.ImageRequest
+import coil3.video.VideoFrameDecoder
 import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.maps.MapLibreMap
@@ -208,6 +217,9 @@ internal fun RecordingActiveContent(
     onVoiceNoteStop: () -> Unit,
     onMapPanned: () -> Unit,
     onRecenterTapped: () -> Unit,
+    // Called with true when the media list is scrolled down (expand panel),
+    // false when scrolled back to the top (restore default ratio).
+    onMediaScrollChanged: (isScrolledDown: Boolean) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     // ── Map side-effect 1: one-time layer setup ────────────────────────────────────
@@ -334,9 +346,31 @@ internal fun RecordingActiveContent(
 
         Spacer(Modifier.height(8.dp))
 
-        // ── Media grid ─────────────────────────────────────────────────────────────
-        // Items flow left-to-right then wrap to the next row (oldest at upper-left).
-        // verticalScroll lets overflow rows scroll without needing a fixed row count.
+        // ── Media flow grid ────────────────────────────────────────────────────────
+        // FlowRow packs items left-to-right and wraps to new rows automatically.
+        //
+        // Expansion trigger: NestedScrollConnection.onPreScroll fires with the user's
+        // raw drag delta before layout runs — this avoids the feedback loop that occurs
+        // when reacting to scrollState.value, which gets clamped to 0 whenever the
+        // expanded panel makes all content fit (causing immediate auto-collapse).
+        //
+        // Sign convention (Compose nested scroll):
+        //   available.y < 0 → user dragging finger UP   → list scrolls down → expand
+        //   available.y > 0 → user dragging finger DOWN → list scrolls up
+        //     + scrollState.value == 0 → already at top → collapse
+        val scrollState = rememberScrollState()
+        val scrollConnection = remember {
+            object : NestedScrollConnection {
+                override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                    when {
+                        available.y < 0 -> onMediaScrollChanged(true)
+                        available.y > 0 && scrollState.value == 0 -> onMediaScrollChanged(false)
+                    }
+                    return Offset.Zero  // never consume — let the FlowRow scroll normally
+                }
+            }
+        }
+
         if (state.recentMedia.isEmpty()) {
             Text(
                 text = "Photos, videos, and notes appear here",
@@ -348,13 +382,14 @@ internal fun RecordingActiveContent(
             FlowRow(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 16.dp),
+                    .nestedScroll(scrollConnection)
+                    .verticalScroll(scrollState)
+                    .padding(horizontal = 16.dp, vertical = 4.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 state.recentMedia.forEach { item ->
-                    MediaStripItem(item)
+                    MediaListItem(item)
                 }
             }
         }
@@ -425,82 +460,143 @@ private fun VoiceNoteButton(
 }
 
 /**
- * Single cell in the media strip LazyRow.
+ * Single row in the media [LazyColumn].
  *
- * All four item types are rendered as 64×64 dp [Card]s for consistent visual rhythm:
- * - **Photo**: full-bleed Coil [AsyncImage].
- * - **Video**: full-bleed thumbnail + play icon overlay in the bottom-right corner.
- * - **TextNote**: edit icon + 40-char preview text (truncated if needed).
- * - **VoiceNote**: mic icon + M:SS duration label.
- *
- * Items are keyed by [MediaItem.id] in the parent LazyRow so Compose can animate additions
- * without re-creating existing cells.
+ * Each type has a fixed 64 dp height; widths differ by type:
+ * - **Photo**: height=64dp, width = natural aspect ratio (wrapContentWidth).
+ * - **Video**: same as Photo; uses [VideoFrameDecoder] so Coil extracts the first frame
+ *   directly from the video file rather than relying on a pre-generated thumbnail.
+ * - **TextNote**: 64dp × 100dp — text fills the card with wrapping, no icon.
+ * - **VoiceNote**: 64dp × 100dp — mic icon + M:SS duration, no animation.
  */
 @Composable
-private fun MediaStripItem(item: MediaItem) {
+private fun MediaListItem(item: MediaItem) {
+    when (item) {
+        is MediaItem.Photo  -> PhotoCard(contentUri = item.contentUri, isVideo = false)
+        is MediaItem.Video  -> PhotoCard(contentUri = item.contentUri, isVideo = true)
+        is MediaItem.TextNote  -> TextNoteCard(item)
+        is MediaItem.VoiceNote -> VoiceNoteCard(item)
+    }
+}
+
+/**
+ * Photo or video card — fixed 64 dp height, width determined by the image's aspect ratio.
+ *
+ * [ContentScale.FillHeight] tells Coil to scale the image so its height fills 64 dp;
+ * [wrapContentWidth] lets the card width match the resulting image width. A minimum width
+ * of 64 dp prevents a zero-width flash before the image loads.
+ *
+ * For videos, [VideoFrameDecoder] is added to the [ImageRequest] so Coil decodes the first
+ * frame from the video file (works with content:// URIs from MediaStore). Without this,
+ * Coil falls back to the generic image pipeline which cannot decode video containers.
+ */
+@Composable
+private fun PhotoCard(contentUri: String, isVideo: Boolean) {
+    val context = LocalContext.current
+    val model = if (isVideo) {
+        // VideoFrameDecoder extracts a bitmap from the first frame of the video.
+        ImageRequest.Builder(context)
+            .data(contentUri)
+            .decoderFactory(VideoFrameDecoder.Factory())
+            .build()
+    } else {
+        contentUri
+    }
+
     Card(
         shape = RoundedCornerShape(8.dp),
-        modifier = Modifier.size(64.dp),
+        modifier = Modifier.height(64.dp),
     ) {
-        Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center,
-        ) {
-            when (item) {
-                is MediaItem.Photo -> AsyncImage(
-                    model = item.contentUri,
-                    contentDescription = "Photo",
-                    modifier = Modifier.fillMaxSize(),
+        Box {
+            AsyncImage(
+                model = model,
+                contentDescription = if (isVideo) "Video thumbnail" else "Photo",
+                contentScale = ContentScale.FillHeight,
+                modifier = Modifier.height(64.dp),
+            )
+            if (isVideo) {
+                // Dark scrim + play icon so the overlay reads on any thumbnail brightness.
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .background(Color.Black.copy(alpha = 0.25f)),
                 )
-                is MediaItem.Video -> {
-                    AsyncImage(
-                        model = item.contentUri,
-                        contentDescription = "Video thumbnail",
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                    // Play icon overlay distinguishes videos from photos at a glance.
-                    Icon(
-                        imageVector = Icons.Default.PlayArrow,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier
-                            .size(24.dp)
-                            .align(Alignment.Center),
-                    )
-                }
-                is MediaItem.TextNote -> Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.padding(4.dp),
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Edit,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp),
-                    )
-                    Text(
-                        text = item.preview,
-                        style = MaterialTheme.typography.labelSmall,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                is MediaItem.VoiceNote -> Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.padding(4.dp),
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Mic,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp),
-                    )
-                    val m = item.durationSeconds / 60
-                    val s = item.durationSeconds % 60
-                    Text(
-                        text = "%d:%02d".format(m, s),
-                        style = MaterialTheme.typography.labelSmall,
-                    )
-                }
+                Icon(
+                    imageVector = Icons.Default.PlayArrow,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier
+                        .size(24.dp)
+                        .align(Alignment.Center),
+                )
             }
+        }
+    }
+}
+
+/**
+ * Text note card — 64×100 dp.
+ *
+ * No icon; the full preview text fills the card with wrapping.
+ * [TextOverflow.Ellipsis] truncates if the content is longer than the card can show.
+ * Tinted with [secondaryContainer] to distinguish from photo/video rows at a glance.
+ */
+@Composable
+private fun TextNoteCard(item: MediaItem.TextNote) {
+    Card(
+        shape = RoundedCornerShape(8.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+        ),
+        modifier = Modifier.size(width = 100.dp, height = 64.dp),
+    ) {
+        Text(
+            text = item.preview,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSecondaryContainer,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 8.dp, vertical = 6.dp),
+        )
+    }
+}
+
+/**
+ * Voice note card — 64×100 dp.
+ *
+ * Shows a mic icon and M:SS duration. No animation — static display only.
+ * Tinted with [tertiaryContainer] for clear visual differentiation.
+ */
+@Composable
+private fun VoiceNoteCard(item: MediaItem.VoiceNote) {
+    val m = item.durationSeconds / 60
+    val s = item.durationSeconds % 60
+
+    Card(
+        shape = RoundedCornerShape(8.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+        ),
+        modifier = Modifier.size(width = 100.dp, height = 64.dp),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 10.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Icon(
+                imageVector = Icons.Default.Mic,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                modifier = Modifier.size(18.dp),
+            )
+            Text(
+                text = "%d:%02d".format(m, s),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onTertiaryContainer,
+            )
         }
     }
 }

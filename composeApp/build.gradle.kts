@@ -28,6 +28,7 @@ kotlin {
             // koin-android alone only provides inject() for Activities/Services/Fragments.
             implementation(libs.koin.androidx.compose)
             implementation(libs.coil.compose)
+            implementation(libs.coil.video)
             implementation(libs.datastore.preferences)
             implementation(libs.maplibre.android)
             implementation(libs.kotlinx.coroutines.android)
