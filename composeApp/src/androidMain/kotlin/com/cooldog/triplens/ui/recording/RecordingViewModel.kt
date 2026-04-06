@@ -43,8 +43,8 @@ import java.util.UUID
  *
  * ## Polling strategy
  * No Flow-based reactive queries — repositories expose one-shot reads. The active state is
- * refreshed every [POLL_INTERVAL_MS] (5 s) to match the spec's "polyline updates throttled to
- * every 5 seconds" requirement. An immediate poll also runs on session start and after each
+ * refreshed every [POLL_INTERVAL_MS] (3 s) to match the STANDARD GPS interval and produce
+ * Google Fit-like real-time track building. An immediate poll also runs on session start and after each
  * note write so the media strip updates without waiting 5 s.
  *
  * ## Timer
@@ -378,7 +378,7 @@ class RecordingViewModel(private val deps: RecordingDeps) : ViewModel() {
     }
 
     /**
-     * Polls track points and media/notes every [POLL_INTERVAL_MS] (5 s).
+     * Polls track points and media/notes every [POLL_INTERVAL_MS] (3 s).
      *
      * Poll-first design: the first fetch fires immediately when the loop starts (no initial
      * delay) so the map polyline and media strip are populated as soon as the session starts,
@@ -471,7 +471,9 @@ class RecordingViewModel(private val deps: RecordingDeps) : ViewModel() {
 
     companion object {
         private const val TAG              = "TripLens/RecordingVM"
-        private const val POLL_INTERVAL_MS = 5_000L
+        // 3s matches the STANDARD profile movingIntervalMs — each poll is very likely to find
+        // at least one new point, so the polyline and GPS dot update at a Google Fit-like cadence.
+        private const val POLL_INTERVAL_MS = 3_000L
         private const val MEDIA_STRIP_MAX  = 10
     }
 }

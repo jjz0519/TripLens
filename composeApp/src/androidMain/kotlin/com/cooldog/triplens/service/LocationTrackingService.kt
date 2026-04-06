@@ -44,7 +44,10 @@ private const val PREFS_NAME              = "triplens_service"
 private const val PREFS_SESSION_ID        = "active_session_id"
 private const val PREFS_PROFILE           = "accuracy_profile"
 private const val PREFS_SESSION_START_TIME = "session_start_time"
-private const val BUFFER_FLUSH_SIZE       = 10
+// Flush every point immediately so the ViewModel's 3-second poll always finds recent data.
+// A 10-point batch at 3s intervals would mean 30s before the first map update — the user
+// could finish a 200m walk before seeing a single polyline segment.
+private const val BUFFER_FLUSH_SIZE       = 1
 
 // Auto-pause: enter after this many consecutive milliseconds below STATIONARY_SPEED_KMH.
 private const val AUTO_PAUSE_THRESHOLD_MS = 3 * 60 * 60 * 1000L  // 3 hours
@@ -127,6 +130,14 @@ class LocationTrackingService : Service() {
     private var prevLat: Double? = null
     private var prevLng: Double? = null
 
+    // --- GPS interval tracking ---
+    // Tracks the interval that was last passed to locationProvider.startUpdates() so we only
+    // re-register when the desired interval actually changes. Re-registering on every fix
+    // causes unnecessary FLP churn (cancel + recreate a LocationRequest on every callback).
+    // Initialised to -1L so the first comparison in onLocationReceived always triggers a
+    // registration (the initial startUpdates in startRecording uses movingIntervalMs directly).
+    private var currentGpsIntervalMs: Long = -1L
+
     // -------------------------------------------------------------------------
     // Lifecycle
     // -------------------------------------------------------------------------
@@ -202,10 +213,11 @@ class LocationTrackingService : Service() {
                 AccuracyProfile.STANDARD
             }
 
-        // Reset per-session distance tracking.
+        // Reset per-session distance and GPS interval tracking.
         cumulativeDistanceMeters = 0.0
         prevLat = null
         prevLng = null
+        currentGpsIntervalMs = currentProfile.movingIntervalMs
 
         // Persist for START_STICKY recovery.
         prefs.edit()
@@ -259,7 +271,12 @@ class LocationTrackingService : Service() {
     private fun onLocationReceived(data: LocationData) {
         val sessionId = currentSessionId ?: return
 
-        val speedKmh = (data.speedMs ?: 0f) * 3.6f
+        // When speedMs is null (common for network/cell-fused fixes or the first fix from FLP),
+        // assume the device is moving rather than defaulting to 0 km/h. Defaulting to 0 would
+        // immediately switch the GPS interval to the 60-second stationary interval, producing a
+        // sparse track for short walks. STATIONARY_SPEED_KMH + 1f (2.0 km/h) is safely in the
+        // WALKING range, so null-speed fixes are classified and tracked as walking.
+        val speedKmh = data.speedMs?.let { it * 3.6f } ?: (STATIONARY_SPEED_KMH + 1f)
         val mode     = TransportClassifier.classify(speedKmh.toDouble())
 
         // --- Auto-pause tracking ---
@@ -315,7 +332,14 @@ class LocationTrackingService : Service() {
                 currentProfile.movingIntervalMs
             else
                 currentProfile.stationaryIntervalMs
-            locationProvider.startUpdates(desiredInterval, currentProfile.priority, ::onLocationReceived)
+            // Only re-register with FLP when the desired interval changes (moving ↔ stationary
+            // transition). Re-registering on every fix would cancel and recreate the LocationRequest
+            // on every callback, which resets the FLP's internal delivery timer unnecessarily.
+            if (desiredInterval != currentGpsIntervalMs) {
+                currentGpsIntervalMs = desiredInterval
+                locationProvider.startUpdates(desiredInterval, currentProfile.priority, ::onLocationReceived)
+                Log.d(TAG, "GPS interval changed to ${desiredInterval}ms (speedKmh=$speedKmh)")
+            }
         }
     }
 
@@ -325,6 +349,7 @@ class LocationTrackingService : Service() {
 
     private fun enterAutoPause() {
         isAutoPaused = true
+        currentGpsIntervalMs = AUTO_PAUSE_INTERVAL_MS
         Log.i(TAG, "Entering auto-pause: switching to ${AUTO_PAUSE_INTERVAL_MS}ms interval")
         if (!isGpsStoppedForTest) {
             locationProvider.startUpdates(AUTO_PAUSE_INTERVAL_MS, currentProfile.priority, ::onLocationReceived)
@@ -334,6 +359,7 @@ class LocationTrackingService : Service() {
     private fun exitAutoPause() {
         isAutoPaused = false
         stationaryStartMs = null
+        currentGpsIntervalMs = currentProfile.movingIntervalMs
         Log.i(TAG, "Exiting auto-pause: restoring ${currentProfile.movingIntervalMs}ms interval")
         if (!isGpsStoppedForTest) {
             locationProvider.startUpdates(currentProfile.movingIntervalMs, currentProfile.priority, ::onLocationReceived)

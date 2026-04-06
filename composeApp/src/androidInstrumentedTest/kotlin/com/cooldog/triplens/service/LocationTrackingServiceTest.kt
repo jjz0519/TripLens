@@ -257,7 +257,8 @@ class LocationTrackingServiceTest {
         LocationTrackingServiceTestHelper.stopGps()
         LocationTrackingServiceTestHelper.resetStationaryState()
 
-        // Inject 5 fixes — below BUFFER_FLUSH_SIZE (10), so they stay buffered until stop.
+        // Inject 5 fixes. With BUFFER_FLUSH_SIZE = 1, each fix flushes immediately, but the
+        // final assertion checks the total DB count at stop — all 5 must be present.
         repeat(5) { i ->
             LocationTrackingServiceTestHelper.injectLocation(
                 com.cooldog.triplens.platform.LocationData(

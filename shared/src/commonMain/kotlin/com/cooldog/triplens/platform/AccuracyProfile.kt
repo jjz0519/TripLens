@@ -15,17 +15,19 @@ enum class AccuracyProfile(
     val stationaryIntervalMs: Long,
     val priority: LocationPriority
 ) {
-    // Default: good accuracy, conservative battery use when stationary.
+    // Default: 3-second moving interval matches the Google Fit "walking" cadence and keeps
+    // the track dense enough that short walks (200–500m) produce smooth polylines. 60-second
+    // stationary interval still saves battery when the user stops.
     STANDARD(
-        movingIntervalMs = 8_000,
+        movingIntervalMs = 3_000,
         stationaryIntervalMs = 60_000,
         priority = LocationPriority.HIGH_ACCURACY
     ),
 
-    // Maximum frequency: used when the user explicitly wants dense tracks.
+    // Maximum frequency: used when the user explicitly wants the densest track possible.
     HIGH(
-        movingIntervalMs = 4_000,
-        stationaryIntervalMs = 4_000,
+        movingIntervalMs = 1_000,
+        stationaryIntervalMs = 1_000,
         priority = LocationPriority.HIGH_ACCURACY
     ),
 
