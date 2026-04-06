@@ -124,7 +124,7 @@ fun RecordingScreen(
                         map.animateCamera(
                             CameraUpdateFactory.newLatLngZoom(
                                 LatLng(location.latitude, location.longitude),
-                                15.0,  // ~streets level, ~200 m visible
+                                14.5,  // ~streets level, ~200 m visible
                             )
                         )
                     }
