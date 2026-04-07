@@ -19,3 +19,12 @@ SELECT * FROM session WHERE status = 'recording' LIMIT 1;
 
 delete:
 DELETE FROM session WHERE id = ?;
+
+-- Rename a session (used by TripDetailScreen three-dot menu).
+updateName:
+UPDATE session SET name = ? WHERE id = ?;
+
+-- Persist the running haversine distance during recording. Called every poll cycle (~3s)
+-- and once more on session completion, so the value survives silent app kills.
+setDistance:
+UPDATE session SET distance_meters = ? WHERE id = ?;

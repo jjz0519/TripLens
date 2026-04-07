@@ -134,6 +134,7 @@ class RecordingViewModelActiveTest {
                 capturedVoiceDuration  = duration
             },
             completeSessionFn  = { _, _ -> completeSessionCallCount++ },
+            setDistanceFn      = { _, _ -> },
             stopServiceFn      = { stopServiceCallCount++ },
             audioRecorder      = FakeAudioRecorder().also { fakeRecorder = it },
             clock              = { FIXED_EPOCH },

@@ -56,6 +56,13 @@ data class RecordingDeps(
     /** setEndTime SQL also sets status = 'completed'. No separate updateStatus call needed. */
     val completeSessionFn: (id: String, endTime: Long) -> Unit,
 
+    /**
+     * Persists the running haversine distance for a session. Called every poll cycle (~3s)
+     * during recording and once more on session completion, so the value survives silent
+     * app kills by the OS.
+     */
+    val setDistanceFn: (id: String, distanceMeters: Double) -> Unit,
+
     /** Sends ACTION_STOP intent to LocationTrackingService. */
     val stopServiceFn: () -> Unit,
 

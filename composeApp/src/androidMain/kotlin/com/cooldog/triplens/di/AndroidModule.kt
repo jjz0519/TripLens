@@ -12,6 +12,7 @@ import com.cooldog.triplens.platform.AndroidAudioRecorder
 import com.cooldog.triplens.platform.AndroidGalleryScanner
 import com.cooldog.triplens.platform.AudioRecorder
 import com.cooldog.triplens.platform.GalleryScanner
+import com.cooldog.triplens.export.ExportUseCase
 import com.cooldog.triplens.platform.LocationProvider
 import com.cooldog.triplens.repository.MediaRefRepository
 import com.cooldog.triplens.repository.NoteRepository
@@ -23,6 +24,10 @@ import com.cooldog.triplens.ui.AppViewModel
 import com.cooldog.triplens.ui.onboarding.OnboardingViewModel
 import com.cooldog.triplens.ui.recording.RecordingDeps
 import com.cooldog.triplens.ui.recording.RecordingViewModel
+import com.cooldog.triplens.ui.tripdetail.TripDetailDeps
+import com.cooldog.triplens.ui.tripdetail.TripDetailViewModel
+import com.cooldog.triplens.ui.triplist.TripListDeps
+import com.cooldog.triplens.ui.triplist.TripListViewModel
 import org.koin.android.ext.koin.androidContext
 import org.koin.androidx.viewmodel.dsl.viewModel
 import org.koin.dsl.module
@@ -143,6 +148,11 @@ val androidModule = module {
                 completeSessionFn = { id, endTime ->
                     get<SessionRepository>().completeSession(id, endTime)
                 },
+                // Persist the running haversine distance on every poll cycle (~3s) during
+                // recording. Survives silent app kills — see RecordingViewModel.refreshActiveData.
+                setDistanceFn = { id, distanceMeters ->
+                    get<SessionRepository>().setDistance(id, distanceMeters)
+                },
                 // ACTION_STOP is handled in LocationTrackingService.onStartCommand, which then
                 // calls stopSelf(). We send via startService (not startForegroundService) because
                 // the service already exists; we are just delivering a command, not starting it.
@@ -155,6 +165,47 @@ val androidModule = module {
 
                 // ── Platform ─────────────────────────────────────────────────────────
                 audioRecorder = get(),
+            )
+        )
+    }
+
+    // ── TripListViewModel ─────────────────────────────────────────────────────
+    // Loads all groups with aggregate stats and exposes rename/delete/export actions.
+    viewModel {
+        TripListViewModel(
+            deps = TripListDeps(
+                getAllGroupsWithStatsFn = { get<TripRepository>().getAllGroupsWithStats() },
+                getTrackPointsByGroupFn = { groupId ->
+                    val sessions = get<SessionRepository>().getSessionsByGroup(groupId)
+                    sessions.flatMap { get<TrackPointRepository>().getBySession(it.id) }
+                },
+                deleteGroupFn = { id -> get<TripRepository>().deleteGroup(id) },
+                renameGroupFn = { id, name, now ->
+                    get<TripRepository>().renameGroup(id, name, now)
+                },
+                exportFn = { groupId, nowMs ->
+                    get<ExportUseCase>().export(groupId, nowMs)
+                },
+            )
+        )
+    }
+
+    // ── TripDetailViewModel ───────────────────────────────────────────────────
+    // Receives groupId via Koin's parametersOf() — cross-platform KMP API.
+    viewModel { params ->
+        val groupId: String = params.get()
+        TripDetailViewModel(
+            deps = TripDetailDeps(
+                groupId = groupId,
+                getGroupByIdFn = { get<TripRepository>().getGroupById(it) },
+                getSessionsByGroupFn = { get<SessionRepository>().getSessionsByGroup(it) },
+                getTrackPointsFn = { get<TrackPointRepository>().getBySession(it) },
+                renameSessionFn = { id, name ->
+                    get<SessionRepository>().renameSession(id, name)
+                },
+                exportFn = { gId, nowMs ->
+                    get<ExportUseCase>().export(gId, nowMs)
+                },
             )
         )
     }

@@ -2,7 +2,6 @@ package com.cooldog.triplens
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -13,6 +12,7 @@ import com.cooldog.triplens.navigation.RecordingRoute
 import com.cooldog.triplens.navigation.TripListRoute
 import com.cooldog.triplens.ui.AppNavGraph
 import com.cooldog.triplens.ui.AppViewModel
+import com.cooldog.triplens.ui.theme.TripLensTheme
 import org.koin.androidx.compose.koinViewModel
 
 /**
@@ -27,7 +27,7 @@ import org.koin.androidx.compose.koinViewModel
  */
 @Composable
 fun App() {
-    MaterialTheme {
+    TripLensTheme {
         val appViewModel: AppViewModel = koinViewModel()
         val startDest by appViewModel.startDestination.collectAsState()
         val isSessionActive by appViewModel.isSessionActive.collectAsState()

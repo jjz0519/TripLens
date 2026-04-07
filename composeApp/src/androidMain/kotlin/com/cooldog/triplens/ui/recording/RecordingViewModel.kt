@@ -3,6 +3,7 @@ package com.cooldog.triplens.ui.recording
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.cooldog.triplens.domain.HaversineUtils
 import com.cooldog.triplens.model.MediaReference
 import com.cooldog.triplens.model.MediaType
 import com.cooldog.triplens.model.Note
@@ -233,6 +234,12 @@ class RecordingViewModel(private val deps: RecordingDeps) : ViewModel() {
 
         viewModelScope.launch {
             withContext(deps.ioDispatcher) {
+                // Final distance flush: compute from current track points and persist before
+                // completing the session, so the aggregate SQL always has the latest value.
+                val finalDistance = HaversineUtils.totalDistance(state.trackPoints)
+                deps.setDistanceFn(sessionId, finalDistance)
+                Log.d(TAG, "Final distance flush: $finalDistance m sessionId=$sessionId")
+
                 deps.completeSessionFn(sessionId, deps.clock())
                 deps.stopServiceFn()
             }
@@ -398,12 +405,22 @@ class RecordingViewModel(private val deps: RecordingDeps) : ViewModel() {
      * Must be called from within [viewModelScope] as it uses `withContext`.
      */
     private suspend fun refreshActiveData(sessionId: String) {
-        val points = withContext(deps.ioDispatcher) { deps.getTrackPointsFn(sessionId) }
+        // Single IO block: fetch track points and persist running distance together
+        // to minimize coroutine scheduling (extra withContext calls cause test hangs
+        // with StandardTestDispatcher in poll loops).
+        val points = withContext(deps.ioDispatcher) {
+            val pts = deps.getTrackPointsFn(sessionId)
+            // Persist the running distance on every poll cycle so the value survives
+            // silent app kills. The DB write is cheap (single UPDATE by primary key).
+            val distance = HaversineUtils.totalDistance(pts)
+            deps.setDistanceFn(sessionId, distance)
+            pts
+        }
         val refs   = withContext(deps.ioDispatcher) { deps.getMediaRefsFn(sessionId) }
         val notes  = withContext(deps.ioDispatcher) { deps.getNotesFn(sessionId) }
         val items  = buildMediaItems(refs, notes)
         updateActiveState { it.copy(trackPoints = points, recentMedia = items) }
-        Log.d(TAG, "Poll: ${points.size} points, ${items.size} media items sessionId=$sessionId")
+        Log.d(TAG, "Poll: ${points.size} points, ${items.size} media sessionId=$sessionId")
     }
 
     /**

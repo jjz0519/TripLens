@@ -1,0 +1,23 @@
+ M composeApp/src/androidMain/kotlin/com/cooldog/triplens/App.kt
+ M composeApp/src/androidMain/kotlin/com/cooldog/triplens/di/AndroidModule.kt
+ M composeApp/src/androidMain/kotlin/com/cooldog/triplens/ui/AppNavGraph.kt
+ M composeApp/src/androidMain/kotlin/com/cooldog/triplens/ui/recording/RecordingDeps.kt
+ M composeApp/src/androidMain/kotlin/com/cooldog/triplens/ui/recording/RecordingViewModel.kt
+ M composeApp/src/androidUnitTest/kotlin/com/cooldog/triplens/ui/recording/RecordingViewModelActiveTest.kt
+ M composeApp/src/androidUnitTest/kotlin/com/cooldog/triplens/ui/recording/RecordingViewModelTest.kt
+ M shared/src/commonMain/kotlin/com/cooldog/triplens/domain/SegmentSmoother.kt
+ M shared/src/commonMain/kotlin/com/cooldog/triplens/repository/SessionRepository.kt
+ M shared/src/commonMain/kotlin/com/cooldog/triplens/repository/TripRepository.kt
+ M shared/src/commonMain/sqldelight/com/cooldog/triplens/db/SessionQueries.sq
+ M shared/src/commonMain/sqldelight/com/cooldog/triplens/db/TripGroupQueries.sq
+ M shared/src/commonMain/sqldelight/com/cooldog/triplens/db/schema.sq
+?? composeApp/src/androidMain/kotlin/com/cooldog/triplens/ui/common/
+?? composeApp/src/androidMain/kotlin/com/cooldog/triplens/ui/theme/
+?? composeApp/src/androidMain/kotlin/com/cooldog/triplens/ui/tripdetail/
+?? composeApp/src/androidMain/kotlin/com/cooldog/triplens/ui/triplist/
+?? composeApp/src/androidUnitTest/kotlin/com/cooldog/triplens/ui/tripdetail/
+?? composeApp/src/androidUnitTest/kotlin/com/cooldog/triplens/ui/triplist/
+?? docs/task14-handoff.md
+?? docs/task14-implementation-plan.md
+?? shared/src/commonMain/kotlin/com/cooldog/triplens/domain/HaversineUtils.kt
+?? status.txt

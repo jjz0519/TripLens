@@ -27,6 +27,20 @@ class SessionRepository(private val db: AppDatabase) {
     fun getSessionsByGroup(groupId: String): List<Session> =
         db.sessionQueries.getByGroupId(groupId).executeAsList().map { it.toModel() }
 
+    /** Rename a session (TripDetailScreen three-dot menu → Rename dialog). */
+    fun renameSession(id: String, newName: String) {
+        db.sessionQueries.updateName(newName, id)
+    }
+
+    /**
+     * Persist the running haversine distance for a session. Called every poll cycle (~3s)
+     * during recording and once more on session completion, so the value survives silent
+     * app kills by the OS.
+     */
+    fun setDistance(id: String, distanceMeters: Double) {
+        db.sessionQueries.setDistance(distanceMeters, id)
+    }
+
     private fun com.cooldog.triplens.db.Session.toModel() = Session(
         id = id,
         groupId = group_id,

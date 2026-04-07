@@ -13,3 +13,41 @@ UPDATE trip_group SET name = ?, updated_at = ? WHERE id = ?;
 
 delete:
 DELETE FROM trip_group WHERE id = ?;
+
+-- Aggregate stats for a single group (used by TripDetailScreen header).
+getGroupStats:
+SELECT
+    COUNT(s.id)                                    AS session_count,
+    MIN(s.start_time)                              AS earliest_start,
+    MAX(COALESCE(s.end_time, s.start_time))        AS latest_end,
+    COALESCE(SUM(s.distance_meters), 0.0)          AS total_distance_meters
+FROM session s
+WHERE s.group_id = ?;
+
+-- Aggregate stats for ALL groups in one query (used by TripListScreen cards).
+-- Returns one row per group. Groups with no sessions still appear (LEFT JOIN).
+-- Media and note counts use correlated subqueries — correct and fast for typical
+-- group counts (<100). Avoids double-counting from multi-table JOINs.
+getAllGroupsWithStats:
+SELECT
+    g.id,
+    g.name,
+    g.created_at,
+    g.updated_at,
+    COUNT(s.id)                                    AS session_count,
+    MIN(s.start_time)                              AS earliest_start,
+    MAX(COALESCE(s.end_time, s.start_time))        AS latest_end,
+    COALESCE(SUM(s.distance_meters), 0.0)          AS total_distance_meters,
+    (SELECT COUNT(*) FROM media_reference mr
+         JOIN session ss ON mr.session_id = ss.id
+         WHERE ss.group_id = g.id AND mr.type = 'photo') AS photo_count,
+    (SELECT COUNT(*) FROM media_reference mr
+         JOIN session ss ON mr.session_id = ss.id
+         WHERE ss.group_id = g.id AND mr.type = 'video') AS video_count,
+    (SELECT COUNT(*) FROM note n
+         JOIN session ss ON n.session_id = ss.id
+         WHERE ss.group_id = g.id)                 AS note_count
+FROM trip_group g
+LEFT JOIN session s ON s.group_id = g.id
+GROUP BY g.id
+ORDER BY g.created_at DESC;

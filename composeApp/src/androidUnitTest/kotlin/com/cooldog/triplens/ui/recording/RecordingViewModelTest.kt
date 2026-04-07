@@ -2,11 +2,14 @@ package com.cooldog.triplens.ui.recording
 
 import com.cooldog.triplens.platform.AccuracyProfile
 import com.cooldog.triplens.platform.AudioRecorder
+import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
@@ -31,9 +34,19 @@ import kotlin.test.assertTrue
 class RecordingViewModelTest {
 
     private val testDispatcher = StandardTestDispatcher()
+    private val viewModels = mutableListOf<RecordingViewModel>()
 
     @Before fun setUp()    { Dispatchers.setMain(testDispatcher) }
     @After  fun tearDown() { Dispatchers.resetMain() }
+
+    private fun runRecordingTest(block: suspend kotlinx.coroutines.test.TestScope.() -> Unit) = runTest(testDispatcher) {
+        try {
+            block()
+        } finally {
+            viewModels.forEach { it.viewModelScope.cancel() }
+            viewModels.clear()
+        }
+    }
 
     private val FIXED_EPOCH = 0L
 
@@ -81,27 +94,28 @@ class RecordingViewModelTest {
             createTextNoteFn  = { _, _, _, _, _, _ -> },
             createVoiceNoteFn = { _, _, _, _, _, _, _ -> },
             completeSessionFn = { _, _ -> },
+            setDistanceFn     = { _, _ -> },
             stopServiceFn     = {},
             audioRecorder     = noOpRecorder,
             clock             = { FIXED_EPOCH },
             ioDispatcher      = testDispatcher,
         )
-    )
+    ).also { viewModels.add(it) }
 
     @Test
-    fun initialState_isIdle() = runTest(testDispatcher) {
+    fun initialState_isIdle() = runRecordingTest {
         val vm = buildViewModel()
         assertEquals(RecordingViewModel.UiState.Idle, vm.uiState.value)
     }
 
     @Test
-    fun onStartTapped_locationDenied_staysIdle_andEmitsShowRationale() = runTest(testDispatcher) {
+    fun onStartTapped_locationDenied_staysIdle_andEmitsShowRationale() = runRecordingTest {
         val vm = buildViewModel()
         val events = mutableListOf<RecordingViewModel.Event>()
         val job = launch { vm.events.collect { events.add(it) } }
 
         vm.onStartTapped(locationGranted = false)
-        advanceUntilIdle()
+        runCurrent()
 
         assertEquals(RecordingViewModel.UiState.Idle, vm.uiState.value)
         assertEquals(listOf<RecordingViewModel.Event>(RecordingViewModel.Event.ShowPermissionRationale), events)
@@ -109,7 +123,7 @@ class RecordingViewModelTest {
     }
 
     @Test
-    fun onStartTapped_locationGranted_transitionsToStartingSession() = runTest(testDispatcher) {
+    fun onStartTapped_locationGranted_transitionsToStartingSession() = runRecordingTest {
         val vm = buildViewModel()
         vm.onStartTapped(locationGranted = true)
         // Before IO completes the state must be StartingSession.
@@ -117,10 +131,10 @@ class RecordingViewModelTest {
     }
 
     @Test
-    fun onStartTapped_locationGranted_createsTripGroupWithTodayDate() = runTest(testDispatcher) {
+    fun onStartTapped_locationGranted_createsTripGroupWithTodayDate() = runRecordingTest {
         val vm = buildViewModel()
         vm.onStartTapped(locationGranted = true)
-        advanceUntilIdle()
+        runCurrent()
 
         assertNotNull(capturedGroupId)
         // epoch 0 in UTC = 1970-01-01
@@ -129,10 +143,10 @@ class RecordingViewModelTest {
     }
 
     @Test
-    fun onStartTapped_locationGranted_createsSessionLinkedToGroup() = runTest(testDispatcher) {
+    fun onStartTapped_locationGranted_createsSessionLinkedToGroup() = runRecordingTest {
         val vm = buildViewModel()
         vm.onStartTapped(locationGranted = true)
-        advanceUntilIdle()
+        runCurrent()
 
         assertNotNull(capturedSessionId)
         assertEquals(capturedGroupId, capturedSessionGroupId, "Session groupId must match the auto-created TripGroup id")
@@ -141,10 +155,10 @@ class RecordingViewModelTest {
     }
 
     @Test
-    fun onStartTapped_locationGranted_startsServiceWithStandardProfile() = runTest(testDispatcher) {
+    fun onStartTapped_locationGranted_startsServiceWithStandardProfile() = runRecordingTest {
         val vm = buildViewModel()
         vm.onStartTapped(locationGranted = true)
-        advanceUntilIdle()
+        runCurrent()
 
         assertNotNull(capturedServiceSessionId)
         assertEquals(capturedSessionId, capturedServiceSessionId, "startService sessionId must match the created session id")
@@ -152,13 +166,13 @@ class RecordingViewModelTest {
     }
 
     @Test
-    fun onStartTapped_locationGranted_emitsNavigateToActiveRecording() = runTest(testDispatcher) {
+    fun onStartTapped_locationGranted_emitsNavigateToActiveRecording() = runRecordingTest {
         val vm = buildViewModel()
         val events = mutableListOf<RecordingViewModel.Event>()
         val job = launch { vm.events.collect { events.add(it) } }
 
         vm.onStartTapped(locationGranted = true)
-        advanceUntilIdle()
+        runCurrent()
 
         assertTrue(
             RecordingViewModel.Event.NavigateToActiveRecording in events,
@@ -168,12 +182,12 @@ class RecordingViewModelTest {
     }
 
     @Test
-    fun onStartTapped_calledTwiceWhileStarting_createsOnlyOneGroup() = runTest(testDispatcher) {
+    fun onStartTapped_calledTwiceWhileStarting_createsOnlyOneGroup() = runRecordingTest {
         val vm = buildViewModel()
 
         vm.onStartTapped(locationGranted = true)
         vm.onStartTapped(locationGranted = true)  // second tap while StartingSession
-        advanceUntilIdle()
+        runCurrent()
 
         assertEquals(1, createGroupCallCount, "createGroup must be called exactly once even if tapped twice")
     }

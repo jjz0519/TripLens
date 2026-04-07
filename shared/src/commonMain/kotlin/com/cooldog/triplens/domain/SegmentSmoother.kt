@@ -95,26 +95,10 @@ object SegmentSmoother {
 
     /**
      * Haversine distance sum over consecutive point pairs, in metres.
-     * Earth radius = 6,371,000 m (spherical approximation; sufficient for display).
+     * Delegates to [HaversineUtils] so the same algorithm is shared with
+     * [com.cooldog.triplens.ui.recording.RecordingViewModel]'s incremental distance persistence.
      */
-    private fun computeDistance(points: List<TrackPoint>): Double {
-        if (points.size < 2) return 0.0
-        var total = 0.0
-        for (i in 1 until points.size) {
-            total += haversine(
-                points[i - 1].latitude, points[i - 1].longitude,
-                points[i].latitude, points[i].longitude
-            )
-        }
-        return total
-    }
-
-    private fun haversine(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
-        val r = 6_371_000.0
-        val dLat = Math.toRadians(lat2 - lat1)
-        val dLon = Math.toRadians(lon2 - lon1)
-        val a = sin(dLat / 2).pow(2) +
-                cos(Math.toRadians(lat1)) * cos(Math.toRadians(lat2)) * sin(dLon / 2).pow(2)
-        return r * 2 * atan2(sqrt(a), sqrt(1 - a))
-    }
+    private fun computeDistance(points: List<TrackPoint>): Double =
+        HaversineUtils.totalDistance(points)
 }
+

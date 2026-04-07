@@ -1,11 +1,7 @@
 package com.cooldog.triplens.ui
 
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -22,7 +18,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
@@ -40,7 +35,12 @@ import com.cooldog.triplens.ui.onboarding.OnboardingScreen
 import com.cooldog.triplens.ui.onboarding.OnboardingViewModel
 import com.cooldog.triplens.ui.recording.RecordingScreen
 import com.cooldog.triplens.ui.recording.RecordingViewModel
+import com.cooldog.triplens.ui.tripdetail.TripDetailScreen
+import com.cooldog.triplens.ui.tripdetail.TripDetailViewModel
+import com.cooldog.triplens.ui.triplist.TripListScreen
+import com.cooldog.triplens.ui.triplist.TripListViewModel
 import org.koin.androidx.compose.koinViewModel
+import org.koin.core.parameter.parametersOf
 
 /**
  * Root NavHost for the app. Wraps all screens in a [Scaffold] with a conditional [AppBottomNavBar].
@@ -72,6 +72,11 @@ fun AppNavGraph(
             navController = navController,
             startDestination = startDestination,
             modifier = Modifier.padding(innerPadding),
+            // Instant tab switching — no fade-in/fade-out when clicking bottom nav buttons.
+            enterTransition = { EnterTransition.None },
+            exitTransition = { ExitTransition.None },
+            popEnterTransition = { EnterTransition.None },
+            popExitTransition = { ExitTransition.None },
         ) {
             composable<OnboardingRoute> {
                 val onboardingViewModel: OnboardingViewModel = koinViewModel()
@@ -86,7 +91,9 @@ fun AppNavGraph(
                 )
             }
             composable<TripListRoute> {
-                TripListScreenStub(
+                val tripListViewModel: TripListViewModel = koinViewModel()
+                TripListScreen(
+                    viewModel = tripListViewModel,
                     onGroupClick = { groupId -> navController.navigate(TripDetailRoute(groupId)) },
                 )
             }
@@ -103,11 +110,14 @@ fun AppNavGraph(
             }
             composable<TripDetailRoute> { backStackEntry ->
                 val route: TripDetailRoute = backStackEntry.toRoute()
-                TripDetailScreenStub(
-                    groupId = route.groupId,
+                val tripDetailViewModel: TripDetailViewModel =
+                    koinViewModel(parameters = { parametersOf(route.groupId) })
+                TripDetailScreen(
+                    viewModel = tripDetailViewModel,
                     onSessionClick = { sessionId ->
                         navController.navigate(SessionReviewRoute(sessionId))
                     },
+                    onBack = { navController.popBackStack() },
                 )
             }
             composable<SessionReviewRoute> { backStackEntry ->
@@ -122,9 +132,8 @@ fun AppNavGraph(
  * Bottom navigation bar shown only on top-level destinations (TripList, Recording, Settings).
  * Hidden on detail screens (TripDetail, SessionReview) so the user can focus on detail content.
  *
- * The Record tab icon pulses (alpha 1.0 → 0.4, 800 ms cycle) when [isSessionActive] is true.
- * [rememberInfiniteTransition] is called unconditionally (Compose rules), but its animated
- * value is only applied when [isSessionActive] is true.
+ * The Record tab icon is static (not pulsing). [isSessionActive] is kept in the API for
+ * potential future use (e.g. badge dot on the Record tab).
  */
 @Composable
 private fun AppBottomNavBar(
@@ -137,20 +146,6 @@ private fun AppBottomNavBar(
     val showBottomBar = currentDestination?.let {
         it.hasRoute<TripListRoute>() || it.hasRoute<RecordingRoute>() || it.hasRoute<SettingsRoute>()
     } ?: false
-
-    // rememberInfiniteTransition must be called unconditionally regardless of showBottomBar
-    // or isSessionActive — calling it conditionally violates Compose's composition rules.
-    val infiniteTransition = rememberInfiniteTransition(label = "recordPulse")
-    val pulsingAlpha by infiniteTransition.animateFloat(
-        initialValue = 1f,
-        targetValue = 0.4f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 800, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse,
-        ),
-        label = "recordPulseAlpha",
-    )
-    val recordIconAlpha = if (isSessionActive) pulsingAlpha else 1f
 
     if (showBottomBar) {
         NavigationBar {
@@ -165,7 +160,6 @@ private fun AppBottomNavBar(
                     Icon(
                         Icons.Default.Mic,
                         contentDescription = "Record",
-                        modifier = Modifier.alpha(recordIconAlpha),
                     )
                 },
                 label = { Text("Record") },
@@ -204,29 +198,14 @@ private fun navigateTopLevel(navController: NavHostController, route: Any) {
 }
 
 // ------------------------------------------------------------------
-// Stub screens — empty Box placeholders to be replaced in Tasks 12–16.
-// The onXxx callbacks are wired to real navigation now so back-stack
-// behavior is correct before the real screens exist.
+// Stub screens — empty Box placeholders to be replaced in future tasks.
+// TripListScreenStub and TripDetailScreenStub have been replaced by real screens.
 // ------------------------------------------------------------------
-
-@Composable
-private fun TripListScreenStub(onGroupClick: (groupId: String) -> Unit) {
-    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Text("Trip List Screen")
-    }
-}
 
 @Composable
 private fun SettingsScreenStub() {
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Text("Settings Screen")
-    }
-}
-
-@Composable
-private fun TripDetailScreenStub(groupId: String, onSessionClick: (sessionId: String) -> Unit) {
-    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Text("Trip Detail\ngroupId: $groupId")
     }
 }
 

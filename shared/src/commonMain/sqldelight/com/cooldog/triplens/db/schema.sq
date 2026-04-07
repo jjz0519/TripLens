@@ -15,7 +15,10 @@ CREATE TABLE session (
     start_time INTEGER NOT NULL,
     end_time   INTEGER,
     status     TEXT    NOT NULL DEFAULT 'recording'
-        CHECK (status IN ('recording', 'completed', 'interrupted'))
+        CHECK (status IN ('recording', 'completed', 'interrupted')),
+    -- Total haversine distance in metres. Updated incrementally during recording
+    -- so the value survives silent app kills. NULL for legacy/pre-migration sessions.
+    distance_meters REAL
 );
 
 CREATE TABLE track_point (
