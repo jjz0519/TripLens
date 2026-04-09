@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -24,17 +23,13 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MicOff
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -54,14 +49,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.platform.LocalContext
-import coil3.compose.AsyncImage
-import coil3.request.ImageRequest
-import coil3.video.VideoFrameDecoder
+import com.cooldog.triplens.ui.common.PhotoCard
+import com.cooldog.triplens.ui.common.TextNoteCard
+import com.cooldog.triplens.ui.common.VoiceNoteCard
 import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.maps.MapLibreMap
@@ -479,127 +472,8 @@ private fun MediaListItem(item: MediaItem) {
     }
 }
 
-/**
- * Photo or video card — fixed 64 dp height, width determined by the image's aspect ratio.
- *
- * [ContentScale.FillHeight] tells Coil to scale the image so its height fills 64 dp;
- * [wrapContentWidth] lets the card width match the resulting image width. A minimum width
- * of 64 dp prevents a zero-width flash before the image loads.
- *
- * For videos, [VideoFrameDecoder] is added to the [ImageRequest] so Coil decodes the first
- * frame from the video file (works with content:// URIs from MediaStore). Without this,
- * Coil falls back to the generic image pipeline which cannot decode video containers.
- */
-@Composable
-private fun PhotoCard(contentUri: String, isVideo: Boolean) {
-    val context = LocalContext.current
-    val model = if (isVideo) {
-        // VideoFrameDecoder extracts a bitmap from the first frame of the video.
-        ImageRequest.Builder(context)
-            .data(contentUri)
-            .decoderFactory(VideoFrameDecoder.Factory())
-            .build()
-    } else {
-        contentUri
-    }
-
-    Card(
-        shape = RoundedCornerShape(8.dp),
-        modifier = Modifier.height(64.dp),
-    ) {
-        Box {
-            AsyncImage(
-                model = model,
-                contentDescription = if (isVideo) "Video thumbnail" else "Photo",
-                contentScale = ContentScale.FillHeight,
-                modifier = Modifier.height(64.dp),
-            )
-            if (isVideo) {
-                // Dark scrim + play icon so the overlay reads on any thumbnail brightness.
-                Box(
-                    modifier = Modifier
-                        .matchParentSize()
-                        .background(Color.Black.copy(alpha = 0.25f)),
-                )
-                Icon(
-                    imageVector = Icons.Default.PlayArrow,
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier
-                        .size(24.dp)
-                        .align(Alignment.Center),
-                )
-            }
-        }
-    }
-}
-
-/**
- * Text note card — 64×100 dp.
- *
- * No icon; the full preview text fills the card with wrapping.
- * [TextOverflow.Ellipsis] truncates if the content is longer than the card can show.
- * Tinted with [secondaryContainer] to distinguish from photo/video rows at a glance.
- */
-@Composable
-private fun TextNoteCard(item: MediaItem.TextNote) {
-    Card(
-        shape = RoundedCornerShape(8.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.secondaryContainer,
-        ),
-        modifier = Modifier.size(width = 100.dp, height = 64.dp),
-    ) {
-        Text(
-            text = item.preview,
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSecondaryContainer,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 8.dp, vertical = 6.dp),
-        )
-    }
-}
-
-/**
- * Voice note card — 64×100 dp.
- *
- * Shows a mic icon and M:SS duration. No animation — static display only.
- * Tinted with [tertiaryContainer] for clear visual differentiation.
- */
-@Composable
-private fun VoiceNoteCard(item: MediaItem.VoiceNote) {
-    val m = item.durationSeconds / 60
-    val s = item.durationSeconds % 60
-
-    Card(
-        shape = RoundedCornerShape(8.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.tertiaryContainer,
-        ),
-        modifier = Modifier.size(width = 100.dp, height = 64.dp),
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 10.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Icon(
-                imageVector = Icons.Default.Mic,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onTertiaryContainer,
-                modifier = Modifier.size(18.dp),
-            )
-            Text(
-                text = "%d:%02d".format(m, s),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onTertiaryContainer,
-            )
-        }
-    }
-}
+// PhotoCard, TextNoteCard, VoiceNoteCard live in ui/common/MediaItemCards.kt
+// and are imported above. They are shared with SessionReviewScreen.
 
 /**
  * Formats an elapsed duration in seconds to a zero-padded HH:MM:SS string.

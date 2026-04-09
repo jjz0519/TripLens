@@ -46,8 +46,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.cooldog.triplens.model.TransportMode
 import com.cooldog.triplens.ui.common.RenameDialog
+import com.cooldog.triplens.ui.common.formatDistance
+import com.cooldog.triplens.ui.common.formatDuration
+import com.cooldog.triplens.ui.common.modeEmoji
 
 /**
  * TripGroup Detail screen — displays a header with aggregate stats and a list of sessions
@@ -333,36 +335,4 @@ private fun SessionRow(
     }
 }
 
-// ── Formatting helpers ──────────────────────────────────────────────────────────
-
-/** Maps transport modes to display emoji for the session breakdown row. */
-private fun modeEmoji(mode: TransportMode): String = when (mode) {
-    TransportMode.STATIONARY   -> "⏸️"
-    TransportMode.WALKING      -> "🚶"
-    TransportMode.CYCLING      -> "🚲"
-    TransportMode.DRIVING      -> "🚗"
-    TransportMode.FAST_TRANSIT -> "🚄"
-}
-
-private fun formatDistance(meters: Double): String {
-    return if (meters < 1000) {
-        "${meters.toInt()} m"
-    } else {
-        "${"%.1f".format(meters / 1000)} km"
-    }
-}
-
-/**
- * Formats duration in seconds for display.
- * - Under 60s: "0m"
- * - Under 1h: "23m"
- * - 1h+: "2h 15m"
- */
-private fun formatDuration(seconds: Long): String {
-    val h = seconds / 3600
-    val m = (seconds % 3600) / 60
-    return when {
-        h > 0 -> "${h}h ${m}m"
-        else  -> "${m}m"
-    }
-}
+// formatDistance, formatDuration, modeEmoji are imported from ui/common/FormatUtils.kt

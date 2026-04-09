@@ -46,6 +46,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.cooldog.triplens.ui.common.DeleteConfirmDialog
 import com.cooldog.triplens.ui.common.RenameDialog
+import com.cooldog.triplens.ui.common.formatDistance
 
 /**
  * Trip List screen — displays all TripGroup cards in a scrollable list.
@@ -338,15 +339,4 @@ private fun TripGroupCard(
     }
 }
 
-/**
- * Formats a distance in metres for display.
- * - Under 1000m: "123 m"
- * - 1000m+: "1.2 km"
- */
-private fun formatDistance(meters: Double): String {
-    return if (meters < 1000) {
-        "${meters.toInt()} m"
-    } else {
-        "${"%.1f".format(meters / 1000)} km"
-    }
-}
+// formatDistance is imported from ui/common/FormatUtils.kt

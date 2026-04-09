@@ -35,6 +35,8 @@ import com.cooldog.triplens.ui.onboarding.OnboardingScreen
 import com.cooldog.triplens.ui.onboarding.OnboardingViewModel
 import com.cooldog.triplens.ui.recording.RecordingScreen
 import com.cooldog.triplens.ui.recording.RecordingViewModel
+import com.cooldog.triplens.ui.sessionreview.SessionReviewScreen
+import com.cooldog.triplens.ui.sessionreview.SessionReviewViewModel
 import com.cooldog.triplens.ui.tripdetail.TripDetailScreen
 import com.cooldog.triplens.ui.tripdetail.TripDetailViewModel
 import com.cooldog.triplens.ui.triplist.TripListScreen
@@ -122,7 +124,12 @@ fun AppNavGraph(
             }
             composable<SessionReviewRoute> { backStackEntry ->
                 val route: SessionReviewRoute = backStackEntry.toRoute()
-                SessionReviewScreenStub(sessionId = route.sessionId)
+                val viewModel: SessionReviewViewModel =
+                    koinViewModel(parameters = { parametersOf(route.sessionId) })
+                SessionReviewScreen(
+                    viewModel = viewModel,
+                    onBack = { navController.popBackStack() },
+                )
             }
         }
     }
@@ -209,9 +216,3 @@ private fun SettingsScreenStub() {
     }
 }
 
-@Composable
-private fun SessionReviewScreenStub(sessionId: String) {
-    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Text("Session Review\nsessionId: $sessionId")
-    }
-}

@@ -24,6 +24,8 @@ import com.cooldog.triplens.ui.AppViewModel
 import com.cooldog.triplens.ui.onboarding.OnboardingViewModel
 import com.cooldog.triplens.ui.recording.RecordingDeps
 import com.cooldog.triplens.ui.recording.RecordingViewModel
+import com.cooldog.triplens.ui.sessionreview.SessionReviewDeps
+import com.cooldog.triplens.ui.sessionreview.SessionReviewViewModel
 import com.cooldog.triplens.ui.tripdetail.TripDetailDeps
 import com.cooldog.triplens.ui.tripdetail.TripDetailViewModel
 import com.cooldog.triplens.ui.triplist.TripListDeps
@@ -185,6 +187,27 @@ val androidModule = module {
                 },
                 exportFn = { groupId, nowMs ->
                     get<ExportUseCase>().export(groupId, nowMs)
+                },
+            )
+        )
+    }
+
+    // ── SessionReviewViewModel ────────────────────────────────────────────────
+    // Receives sessionId via Koin's parametersOf().
+    viewModel { params ->
+        val sessionId: String = params.get()
+        val ctx = androidContext()
+        SessionReviewViewModel(
+            deps = SessionReviewDeps(
+                sessionId = sessionId,
+                getSessionFn = { get<SessionRepository>().getSessionById(it) },
+                getTrackPointsFn = { get<TrackPointRepository>().getBySession(it) },
+                getMediaRefsFn = { get<MediaRefRepository>().getBySession(it) },
+                getNotesFn = { get<NoteRepository>().getBySession(it) },
+                // Voice note files are stored in {filesDir}/notes/{filename}.
+                // Resolved here to keep Context out of the ViewModel.
+                getAudioFilePathFn = { filename ->
+                    ctx.filesDir.resolve("notes/$filename").absolutePath
                 },
             )
         )
