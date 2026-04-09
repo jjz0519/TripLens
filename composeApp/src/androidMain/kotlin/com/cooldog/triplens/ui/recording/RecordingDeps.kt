@@ -27,6 +27,13 @@ data class RecordingDeps(
 
     val createGroupFn: (id: String, name: String, now: Long) -> Unit,
     val createSessionFn: (id: String, groupId: String, name: String, startTime: Long) -> Unit,
+    /**
+     * Reads the user's preferred [AccuracyProfile] from DataStore before starting the service.
+     * Suspend because DataStore reads are async; called inside [withContext(ioDispatcher)] in
+     * [RecordingViewModel.onStartTapped].
+     */
+    val getAccuracyProfileFn: suspend () -> AccuracyProfile,
+
     /** Must use ContextCompat.startForegroundService on API 26+. */
     val startService: (sessionId: String, profile: AccuracyProfile, sessionStartTime: Long) -> Unit,
 

@@ -1,6 +1,9 @@
 package com.cooldog.triplens.ui.onboarding
 
 import com.cooldog.triplens.data.AppPreferences
+import com.cooldog.triplens.data.Language
+import com.cooldog.triplens.data.ScanInterval
+import com.cooldog.triplens.platform.AccuracyProfile
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
@@ -32,6 +35,13 @@ class OnboardingViewModelTest {
         var onboardingComplete = false
         override suspend fun isOnboardingComplete() = onboardingComplete
         override suspend fun setOnboardingComplete() { onboardingComplete = true }
+        // Task 16 additions — not exercised by onboarding tests; stubs return defaults.
+        override suspend fun getLanguage()                        = Language.SYSTEM
+        override suspend fun setLanguage(language: Language)      = Unit
+        override suspend fun getAccuracyProfile()                 = AccuracyProfile.STANDARD
+        override suspend fun setAccuracyProfile(profile: AccuracyProfile) = Unit
+        override suspend fun getScanInterval()                    = ScanInterval.STANDARD
+        override suspend fun setScanInterval(interval: ScanInterval)      = Unit
     }
 
     private fun buildViewModel(prefs: FakeAppPreferences = FakeAppPreferences()) =

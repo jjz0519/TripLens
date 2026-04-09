@@ -1,18 +1,21 @@
 package com.cooldog.triplens.di
 
 import android.content.Intent
+import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.content.ContextCompat
-import com.cooldog.triplens.db.AppDatabase
-import com.cooldog.triplens.db.DatabaseDriverFactory
+import androidx.core.os.LocaleListCompat
 import com.cooldog.triplens.data.AppPreferences
 import com.cooldog.triplens.data.DataStoreAppPreferences
+import com.cooldog.triplens.data.Language
+import com.cooldog.triplens.db.AppDatabase
+import com.cooldog.triplens.db.DatabaseDriverFactory
 import com.cooldog.triplens.export.AndroidFileSystem
+import com.cooldog.triplens.export.ExportUseCase
 import com.cooldog.triplens.export.PlatformFileSystem
 import com.cooldog.triplens.platform.AndroidAudioRecorder
 import com.cooldog.triplens.platform.AndroidGalleryScanner
 import com.cooldog.triplens.platform.AudioRecorder
 import com.cooldog.triplens.platform.GalleryScanner
-import com.cooldog.triplens.export.ExportUseCase
 import com.cooldog.triplens.platform.LocationProvider
 import com.cooldog.triplens.repository.MediaRefRepository
 import com.cooldog.triplens.repository.NoteRepository
@@ -26,6 +29,7 @@ import com.cooldog.triplens.ui.recording.RecordingDeps
 import com.cooldog.triplens.ui.recording.RecordingViewModel
 import com.cooldog.triplens.ui.sessionreview.SessionReviewDeps
 import com.cooldog.triplens.ui.sessionreview.SessionReviewViewModel
+import com.cooldog.triplens.ui.settings.SettingsViewModel
 import com.cooldog.triplens.ui.tripdetail.TripDetailDeps
 import com.cooldog.triplens.ui.tripdetail.TripDetailViewModel
 import com.cooldog.triplens.ui.triplist.TripListDeps
@@ -114,6 +118,11 @@ val androidModule = module {
                 },
                 createSessionFn = { id, groupId, name, startTime ->
                     get<SessionRepository>().createSession(id, groupId, name, startTime)
+                },
+                // Read the saved accuracy profile from DataStore so the user's Settings
+                // choice is honoured at session start (Task 16).
+                getAccuracyProfileFn = {
+                    get<AppPreferences>().getAccuracyProfile()
                 },
                 // ContextCompat.startForegroundService is required on API 26+: plain
                 // startService() cannot promote a service to foreground on those versions.
@@ -230,6 +239,35 @@ val androidModule = module {
                     get<ExportUseCase>().export(gId, nowMs)
                 },
             )
+        )
+    }
+
+    // ── SettingsViewModel ─────────────────────────────────────────────────────
+    // Reads/writes DataStore preferences and notifies active service on profile change.
+    viewModel {
+        val ctx = androidContext()
+        SettingsViewModel(
+            appPreferences   = get(),
+            isSessionActiveFn = { get<SessionRepository>().getActiveSession() != null },
+            // Send ACTION_UPDATE_PROFILE so the running service shifts its GPS interval
+            // immediately without waiting for the next session start.
+            notifyServiceFn  = { profile ->
+                val intent = Intent(ctx, LocationTrackingService::class.java).apply {
+                    action = LocationTrackingService.ACTION_UPDATE_PROFILE
+                    putExtra(LocationTrackingService.EXTRA_ACCURACY_PROFILE, profile.name)
+                }
+                ctx.startService(intent)
+            },
+            // Build the LocaleListCompat and call AppCompatDelegate on the main thread.
+            // SYSTEM → empty locale list (OS default); others → the BCP 47 tag.
+            applyLocaleFn = { language ->
+                val localeList = if (language.bcp47Tag == null) {
+                    LocaleListCompat.getEmptyLocaleList()
+                } else {
+                    LocaleListCompat.forLanguageTags(language.bcp47Tag)
+                }
+                AppCompatDelegate.setApplicationLocales(localeList)
+            },
         )
     }
 }

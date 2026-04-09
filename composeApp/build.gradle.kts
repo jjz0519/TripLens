@@ -29,6 +29,8 @@ kotlin {
             implementation(libs.koin.androidx.compose)
             implementation(libs.coil.compose)
             implementation(libs.coil.video)
+            // AppCompatDelegate.setApplicationLocales() for per-app language switching (Task 16).
+            implementation(libs.androidx.appcompat)
             implementation(libs.datastore.preferences)
             implementation(libs.maplibre.android)
             implementation(libs.kotlinx.coroutines.android)

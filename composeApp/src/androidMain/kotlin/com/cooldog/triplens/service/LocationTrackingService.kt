@@ -164,6 +164,22 @@ class LocationTrackingService : Service() {
                 stopRecording()
                 return START_NOT_STICKY
             }
+            ACTION_UPDATE_PROFILE -> {
+                // Mid-session accuracy profile change from Settings screen (Task 16).
+                // If no session is running (e.g., stale intent), log and ignore.
+                val profileName = intent.getStringExtra(EXTRA_ACCURACY_PROFILE)
+                if (currentSessionId == null) {
+                    Log.w(TAG, "ACTION_UPDATE_PROFILE received but no active session — ignoring")
+                } else if (profileName == null) {
+                    Log.w(TAG, "ACTION_UPDATE_PROFILE: missing $EXTRA_ACCURACY_PROFILE extra")
+                } else {
+                    val newProfile = runCatching { AccuracyProfile.valueOf(profileName) }.getOrElse {
+                        Log.w(TAG, "ACTION_UPDATE_PROFILE: unknown profile '$profileName'")
+                        return START_STICKY
+                    }
+                    updateAccuracyProfile(newProfile)
+                }
+            }
             null -> {
                 // System restart: recover from SharedPreferences.
                 val sessionId   = prefs.getString(PREFS_SESSION_ID, null)
@@ -340,6 +356,39 @@ class LocationTrackingService : Service() {
                 locationProvider.startUpdates(desiredInterval, currentProfile.priority, ::onLocationReceived)
                 Log.d(TAG, "GPS interval changed to ${desiredInterval}ms (speedKmh=$speedKmh)")
             }
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Profile update
+    // -------------------------------------------------------------------------
+
+    /**
+     * Switches the active GPS accuracy profile mid-session.
+     *
+     * Called when the user changes the accuracy setting in the Settings screen while a session
+     * is recording. The new profile is applied immediately:
+     * - [currentProfile] is updated so future speed-based interval decisions use the new profile.
+     * - SharedPreferences are updated so START_STICKY recovery also uses the new profile.
+     * - [locationProvider.startUpdates] is called with the new moving interval so FLP shifts
+     *   its delivery schedule right away (no need to wait for the next fix).
+     *
+     * If the device is currently auto-paused, the profile is saved but the GPS interval is
+     * left at [AUTO_PAUSE_INTERVAL_MS]. The new profile's intervals kick in when [exitAutoPause]
+     * is called on the next movement fix.
+     */
+    private fun updateAccuracyProfile(newProfile: AccuracyProfile) {
+        Log.i(TAG, "Accuracy profile updated: $currentProfile → $newProfile")
+        currentProfile = newProfile
+        prefs.edit().putString(PREFS_PROFILE, newProfile.name).apply()
+
+        if (!isAutoPaused && !isGpsStoppedForTest) {
+            // Use the moving interval as the new baseline; onLocationReceived will switch to
+            // stationaryIntervalMs on the next stationary fix if speed drops below threshold.
+            val newInterval = newProfile.movingIntervalMs
+            currentGpsIntervalMs = newInterval
+            locationProvider.startUpdates(newInterval, newProfile.priority, ::onLocationReceived)
+            Log.d(TAG, "GPS re-registered: interval=${newInterval}ms, priority=${newProfile.priority}")
         }
     }
 
@@ -579,6 +628,8 @@ class LocationTrackingService : Service() {
     companion object {
         const val ACTION_START                = "com.cooldog.triplens.ACTION_START"
         const val ACTION_STOP                 = "com.cooldog.triplens.ACTION_STOP"
+        /** Mid-session accuracy profile switch triggered by the Settings screen (Task 16). */
+        const val ACTION_UPDATE_PROFILE       = "com.cooldog.triplens.ACTION_UPDATE_PROFILE"
         const val EXTRA_SESSION_ID            = "session_id"
         const val EXTRA_ACCURACY_PROFILE      = "accuracy_profile"
         const val EXTRA_SESSION_START_TIME    = "session_start_time"

@@ -372,7 +372,7 @@ Each task entry:
 
 ---
 
-### Task 16: Settings Screen
+### Task 16: Settings Screen ✓ DONE
 
 **Goal**: Implement the Settings screen with language selection, GPS accuracy profile, and gallery scan interval, all persisted via DataStore.
 
@@ -475,9 +475,9 @@ Each task entry:
 | 11 | Navigation Graph | Navigation | All routes + dynamic start | ✓ |
 | 12 | Recording Screen — Idle | UI | Permissions + group selector | ✓ |
 | 13 | Recording Screen — Active | UI | Live map + notes + stop | ✓ |
-| 14 | Trip List + Detail Screens | UI | Group cards + session list |
-| 15 | Session Review Screen | UI | Full-trip map + timeline |
-| 16 | Settings Screen | UI | DataStore-backed preferences |
+| 14 | Trip List + Detail Screens | UI | Group cards + session list | ✓ |
+| 15 | Session Review Screen | UI | Full-trip map + timeline | ✓ |
+| 16 | Settings Screen | UI | DataStore-backed preferences | ✓ |
 | 17 | Localization | Cross-cutting | EN + ZH strings |
 | 18 | Error Handling + Recovery | Cross-cutting | Recovery dialog + DB check |
 | 19 | Export Integration + Share | Export | Share sheet + progress UI |

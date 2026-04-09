@@ -83,6 +83,7 @@ class RecordingViewModelTest {
                 capturedSessionName      = name
                 capturedSessionStartTime = startTime
             },
+            getAccuracyProfileFn = { AccuracyProfile.STANDARD },
             startService     = { sessionId, profile, _ ->
                 capturedServiceSessionId = sessionId
                 capturedServiceProfile   = profile

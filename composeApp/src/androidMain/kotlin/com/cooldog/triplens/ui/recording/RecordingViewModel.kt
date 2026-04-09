@@ -171,8 +171,9 @@ class RecordingViewModel(private val deps: RecordingDeps) : ViewModel() {
                 deps.createSessionFn(sessionId, groupId, "Session 1", now)
                 Log.d(TAG, "Created Session id=$sessionId groupId=$groupId")
 
-                deps.startService(sessionId, AccuracyProfile.STANDARD, now)
-                Log.i(TAG, "LocationTrackingService started sessionId=$sessionId profile=STANDARD")
+                val profile = deps.getAccuracyProfileFn()
+                deps.startService(sessionId, profile, now)
+                Log.i(TAG, "LocationTrackingService started sessionId=$sessionId profile=$profile")
 
                 // Transition to active state before returning to the main dispatcher.
                 _uiState.value = UiState.ActiveRecording(

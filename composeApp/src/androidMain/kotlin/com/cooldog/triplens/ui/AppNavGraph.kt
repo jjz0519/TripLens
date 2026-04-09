@@ -2,7 +2,6 @@ package com.cooldog.triplens.ui
 
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -16,7 +15,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -39,6 +37,8 @@ import com.cooldog.triplens.ui.sessionreview.SessionReviewScreen
 import com.cooldog.triplens.ui.sessionreview.SessionReviewViewModel
 import com.cooldog.triplens.ui.tripdetail.TripDetailScreen
 import com.cooldog.triplens.ui.tripdetail.TripDetailViewModel
+import com.cooldog.triplens.ui.settings.SettingsScreen
+import com.cooldog.triplens.ui.settings.SettingsViewModel
 import com.cooldog.triplens.ui.triplist.TripListScreen
 import com.cooldog.triplens.ui.triplist.TripListViewModel
 import org.koin.androidx.compose.koinViewModel
@@ -108,7 +108,8 @@ fun AppNavGraph(
                 )
             }
             composable<SettingsRoute> {
-                SettingsScreenStub()
+                val settingsViewModel: SettingsViewModel = koinViewModel()
+                SettingsScreen(viewModel = settingsViewModel)
             }
             composable<TripDetailRoute> { backStackEntry ->
                 val route: TripDetailRoute = backStackEntry.toRoute()
@@ -204,15 +205,4 @@ private fun navigateTopLevel(navController: NavHostController, route: Any) {
     }
 }
 
-// ------------------------------------------------------------------
-// Stub screens — empty Box placeholders to be replaced in future tasks.
-// TripListScreenStub and TripDetailScreenStub have been replaced by real screens.
-// ------------------------------------------------------------------
-
-@Composable
-private fun SettingsScreenStub() {
-    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Text("Settings Screen")
-    }
-}
 

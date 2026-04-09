@@ -116,9 +116,10 @@ class RecordingViewModelActiveTest {
 
     private fun buildViewModel() = RecordingViewModel(
         RecordingDeps(
-            createGroupFn      = { _, _, _ -> },
-            createSessionFn    = { _, _, _, _ -> },
-            startService       = { _, _, _ -> },
+            createGroupFn        = { _, _, _ -> },
+            createSessionFn      = { _, _, _, _ -> },
+            getAccuracyProfileFn = { AccuracyProfile.STANDARD },
+            startService         = { _, _, _ -> },
             getTrackPointsFn   = { fakeTrackPoints },
             getMediaRefsFn     = { fakeMediaRefs },
             getNotesFn         = { fakeNotes },
