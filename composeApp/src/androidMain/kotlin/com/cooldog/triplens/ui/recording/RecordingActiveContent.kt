@@ -49,9 +49,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.cooldog.triplens.R
 import com.cooldog.triplens.ui.common.PhotoCard
 import com.cooldog.triplens.ui.common.TextNoteCard
 import com.cooldog.triplens.ui.common.VoiceNoteCard
@@ -149,11 +151,11 @@ internal fun RecordingActiveTopBar(
             ) {
                 Icon(
                     imageVector = Icons.Default.Stop,
-                    contentDescription = "Stop recording",
+                    contentDescription = stringResource(R.string.recording_stop_content_desc),
                     modifier = Modifier.size(18.dp),
                 )
                 Spacer(Modifier.width(4.dp))
-                Text(text = "Stop", style = MaterialTheme.typography.labelMedium)
+                Text(text = stringResource(R.string.recording_stop_button), style = MaterialTheme.typography.labelMedium)
             }
         }
     }
@@ -313,7 +315,7 @@ internal fun RecordingActiveContent(
                     modifier = Modifier.size(16.dp),
                 )
                 Spacer(Modifier.width(6.dp))
-                Text("Text Note")
+                Text(stringResource(R.string.recording_text_note_button))
             }
 
             VoiceNoteButton(
@@ -333,7 +335,7 @@ internal fun RecordingActiveContent(
                     .align(Alignment.CenterHorizontally)
                     .padding(top = 4.dp),
             ) {
-                Text("Re-center", style = MaterialTheme.typography.labelMedium)
+                Text(stringResource(R.string.recording_recenter_button), style = MaterialTheme.typography.labelMedium)
             }
         }
 
@@ -366,7 +368,7 @@ internal fun RecordingActiveContent(
 
         if (state.recentMedia.isEmpty()) {
             Text(
-                text = "Photos, videos, and notes appear here",
+                text = stringResource(R.string.recording_media_empty),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 16.dp),
@@ -430,7 +432,7 @@ private fun VoiceNoteButton(
         ) {
             Icon(
                 imageVector = Icons.Default.MicOff,
-                contentDescription = "Stop voice recording",
+                contentDescription = stringResource(R.string.recording_voice_stop_content_desc),
                 modifier = Modifier.size(16.dp),
             )
             Spacer(Modifier.width(6.dp))
@@ -443,11 +445,11 @@ private fun VoiceNoteButton(
         ) {
             Icon(
                 imageVector = Icons.Default.Mic,
-                contentDescription = "Start voice recording",
+                contentDescription = stringResource(R.string.recording_voice_start_content_desc),
                 modifier = Modifier.size(16.dp),
             )
             Spacer(Modifier.width(6.dp))
-            Text("Voice Note")
+            Text(stringResource(R.string.recording_voice_note_button))
         }
     }
 }

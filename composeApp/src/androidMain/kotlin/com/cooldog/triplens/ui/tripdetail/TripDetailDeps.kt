@@ -36,6 +36,19 @@ data class TripDetailDeps(
     /** Calls [com.cooldog.triplens.export.ExportUseCase.export]. */
     val exportFn: suspend (groupId: String, nowMs: Long) -> ExportResult,
 
+    /**
+     * Localised "In progress" label used by [TripDetailViewModel.formatSessionTimeRange] when
+     * a session has no end time yet (still recording). Injected so tests can assert against a
+     * fixed string without depending on Android resources.
+     */
+    val sessionInProgressLabel: String = "In progress",
+
+    /**
+     * Localised error message shown in [TripDetailViewModel.UiState.Error] when the group ID
+     * from the navigation route does not match any group in the database.
+     */
+    val tripNotFoundMessage: String = "Trip not found",
+
     /** Injected so tests pass `{ FIXED_EPOCH }` for deterministic timestamps. */
     val clock: () -> Long = { System.currentTimeMillis() },
 

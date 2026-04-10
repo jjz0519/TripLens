@@ -34,7 +34,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.cooldog.triplens.R
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.PermissionChecker
 import androidx.lifecycle.Lifecycle
@@ -219,18 +221,18 @@ fun RecordingScreen(
     if (showStopDialog) {
         AlertDialog(
             onDismissRequest = { showStopDialog = false },
-            title = { Text("Stop Recording?") },
-            text = { Text("The session will be saved. You can review it afterwards.") },
+            title = { Text(stringResource(R.string.recording_stop_dialog_title)) },
+            text = { Text(stringResource(R.string.recording_stop_dialog_message)) },
             confirmButton = {
                 TextButton(
                     onClick = {
                         showStopDialog = false
                         viewModel.onStopConfirmed()
                     }
-                ) { Text("Stop") }
+                ) { Text(stringResource(R.string.recording_stop_dialog_confirm)) }
             },
             dismissButton = {
-                TextButton(onClick = { showStopDialog = false }) { Text("Cancel") }
+                TextButton(onClick = { showStopDialog = false }) { Text(stringResource(R.string.action_cancel)) }
             },
         )
     }
@@ -363,13 +365,13 @@ private fun TextNoteSheet(
                 .imePadding()
                 .padding(bottom = 16.dp),
         ) {
-            Text("Add Text Note", style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.recording_text_note_title), style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(12.dp))
             OutlinedTextField(
                 value = text,
                 onValueChange = { text = it },
                 modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("What's happening here?") },
+                placeholder = { Text(stringResource(R.string.recording_text_note_placeholder)) },
                 minLines = 3,
                 maxLines = 6,
             )
@@ -379,7 +381,7 @@ private fun TextNoteSheet(
                 enabled = text.isNotBlank(),
                 modifier = Modifier.align(Alignment.End),
             ) {
-                Text("Save Note")
+                Text(stringResource(R.string.recording_text_note_save))
             }
         }
     }

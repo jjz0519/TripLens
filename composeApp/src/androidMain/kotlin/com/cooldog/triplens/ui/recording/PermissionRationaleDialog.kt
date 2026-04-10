@@ -8,6 +8,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import com.cooldog.triplens.R
 
 /**
  * Post-onboarding fallback shown when ACCESS_FINE_LOCATION is revoked after the app is installed.
@@ -24,13 +26,8 @@ fun PermissionRationaleDialog(onDismiss: () -> Unit) {
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Location Permission Required") },
-        text = {
-            Text(
-                "Background location access is required to track your trip. " +
-                "Please re-enable it in Settings."
-            )
-        },
+        title = { Text(stringResource(R.string.permission_rationale_title)) },
+        text = { Text(stringResource(R.string.permission_rationale_message)) },
         confirmButton = {
             TextButton(
                 onClick = {
@@ -41,11 +38,11 @@ fun PermissionRationaleDialog(onDismiss: () -> Unit) {
                     onDismiss()
                 }
             ) {
-                Text("Open Settings")
+                Text(stringResource(R.string.action_open_settings))
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
         },
     )
 }

@@ -36,8 +36,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.cooldog.triplens.R
 
 /**
  * First-launch permission onboarding screen. Shown exactly once — [OnboardingViewModel] writes
@@ -112,10 +114,10 @@ fun OnboardingScreen(
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text(text = "TripLens", style = MaterialTheme.typography.displaySmall)
+        Text(text = stringResource(R.string.onboarding_app_name), style = MaterialTheme.typography.displaySmall)
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = "To record your trips, TripLens needs the following permissions:",
+            text = stringResource(R.string.onboarding_subtitle),
             style = MaterialTheme.typography.bodyMedium,
             textAlign = TextAlign.Center,
         )
@@ -123,26 +125,26 @@ fun OnboardingScreen(
 
         PermissionRow(
             icon = Icons.Default.LocationOn,
-            title = "Location (Always)",
-            description = "Required to track your trip in the background",
+            title = stringResource(R.string.onboarding_permission_location_title),
+            description = stringResource(R.string.onboarding_permission_location_desc),
         )
         PermissionRow(
             icon = Icons.Default.Mic,
-            title = "Microphone",
-            description = "For recording voice notes during your trip",
+            title = stringResource(R.string.onboarding_permission_mic_title),
+            description = stringResource(R.string.onboarding_permission_mic_desc),
         )
         PermissionRow(
             icon = Icons.Default.Photo,
-            title = "Photos & Media",
-            description = "To auto-index photos taken during your trip",
+            title = stringResource(R.string.onboarding_permission_photos_title),
+            description = stringResource(R.string.onboarding_permission_photos_desc),
         )
         // POST_NOTIFICATIONS is only a runtime permission on Android 13+ (API 33).
         // On older versions it is granted automatically with no dialog needed.
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             PermissionRow(
                 icon = Icons.Default.Notifications,
-                title = "Notifications",
-                description = "To show the live recording status notification",
+                title = stringResource(R.string.onboarding_permission_notifications_title),
+                description = stringResource(R.string.onboarding_permission_notifications_desc),
             )
         }
 
@@ -150,7 +152,7 @@ fun OnboardingScreen(
 
         if (locationPermanentlyDenied) {
             Text(
-                text = "Location permission was denied. Please enable it in Settings to use TripLens.",
+                text = stringResource(R.string.onboarding_location_denied),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.error,
                 textAlign = TextAlign.Center,
@@ -165,7 +167,7 @@ fun OnboardingScreen(
                 },
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Text("Open Settings")
+                Text(stringResource(R.string.action_open_settings))
             }
         } else {
             Button(
@@ -189,13 +191,13 @@ fun OnboardingScreen(
                 },
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Text("Grant Permissions")
+                Text(stringResource(R.string.onboarding_grant_permissions))
             }
         }
 
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = "You can change these later in Settings",
+            text = stringResource(R.string.onboarding_change_later),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

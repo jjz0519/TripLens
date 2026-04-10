@@ -40,7 +40,9 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.cooldog.triplens.R
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.video.VideoFrameDecoder
@@ -131,7 +133,7 @@ private fun PhotoPreview(contentUri: String, isVideo: Boolean) {
 
     AsyncImage(
         model = model,
-        contentDescription = if (isVideo) "Video poster frame" else "Photo preview",
+        contentDescription = if (isVideo) stringResource(R.string.media_preview_video_content_desc) else stringResource(R.string.media_preview_photo_content_desc),
         contentScale = ContentScale.Fit,
         modifier = Modifier
             .fillMaxWidth()
@@ -225,7 +227,7 @@ private fun VoiceNotePreview(item: MediaItem.VoiceNote, audioFilePath: String?) 
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Text(
-            text = "Voice Note",
+            text = stringResource(R.string.media_preview_voice_note_title),
             style = MaterialTheme.typography.titleMedium,
         )
 
@@ -284,7 +286,7 @@ private fun VoiceNotePreview(item: MediaItem.VoiceNote, audioFilePath: String?) 
         ) {
             Icon(
                 imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                contentDescription = if (isPlaying) "Pause" else "Play",
+                contentDescription = if (isPlaying) stringResource(R.string.media_preview_pause_content_desc) else stringResource(R.string.media_preview_play_content_desc),
                 modifier = Modifier.size(36.dp),
             )
         }
@@ -305,7 +307,7 @@ private fun TextNotePreview(content: String) {
             .verticalScroll(rememberScrollState()),
     ) {
         Text(
-            text = "Note",
+            text = stringResource(R.string.media_preview_note_title),
             style = MaterialTheme.typography.titleMedium,
         )
         Spacer(Modifier.height(12.dp))

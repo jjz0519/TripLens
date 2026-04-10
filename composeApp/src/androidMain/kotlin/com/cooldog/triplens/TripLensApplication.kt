@@ -4,8 +4,10 @@ import android.app.Application
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.util.Log
+import com.cooldog.triplens.R
 import com.cooldog.triplens.di.androidModule
 import com.cooldog.triplens.di.sharedModule
+import com.cooldog.triplens.i18n.Strings
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.context.startKoin
 import org.maplibre.android.MapLibre
@@ -36,7 +38,11 @@ class TripLensApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
-        Log.i(TAG, "onCreate: starting Koin and creating notification channel")
+        Log.i(TAG, "onCreate: initialising Strings, Koin, and notification channel")
+
+        // Initialise the shared-module Strings context holder before startKoin so that any
+        // commonMain code that runs during DI graph construction can safely access string values.
+        Strings.init(this)
 
         // MapLibre requires a one-time getInstance() call before any MapView is created.
         // An empty API key is correct for OpenFreeMap (no key required).
@@ -62,10 +68,10 @@ class TripLensApplication : Application() {
     private fun createRecordingNotificationChannel() {
         val channel = NotificationChannel(
             RECORDING_CHANNEL_ID,
-            "TripLens Recording",
+            getString(R.string.notification_recording_channel_name),
             NotificationManager.IMPORTANCE_LOW
         ).apply {
-            description = "Shown while TripLens is recording a trip"
+            description = getString(R.string.notification_recording_channel_desc)
         }
         val manager = getSystemService(NotificationManager::class.java)
         manager.createNotificationChannel(channel)

@@ -16,6 +16,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import com.cooldog.triplens.R
 import androidx.compose.ui.unit.dp
 import com.cooldog.triplens.data.Language
 import com.cooldog.triplens.data.ScanInterval
@@ -48,7 +50,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
         verticalArrangement = Arrangement.spacedBy(28.dp),
     ) {
         // ── Language ──────────────────────────────────────────────────────────
-        SettingsSection(title = "Language") {
+        SettingsSection(title = stringResource(R.string.settings_language_title)) {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Language.entries.forEach { lang ->
                     FilterChip(
@@ -57,9 +59,9 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                         label    = {
                             Text(
                                 when (lang) {
-                                    Language.SYSTEM -> "System default"
-                                    Language.EN     -> "English"
-                                    Language.ZH_CN  -> "简体中文"
+                                    Language.SYSTEM -> stringResource(R.string.settings_language_system)
+                                    Language.EN     -> stringResource(R.string.settings_language_en)
+                                    Language.ZH_CN  -> stringResource(R.string.settings_language_zh_cn)
                                 }
                             )
                         },
@@ -69,7 +71,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
         }
 
         // ── GPS Accuracy ──────────────────────────────────────────────────────
-        SettingsSection(title = "GPS accuracy") {
+        SettingsSection(title = stringResource(R.string.settings_accuracy_title)) {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 AccuracyProfile.entries.forEach { profile ->
                     FilterChip(
@@ -78,9 +80,9 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                         label    = {
                             Text(
                                 when (profile) {
-                                    AccuracyProfile.STANDARD     -> "Standard"
-                                    AccuracyProfile.HIGH         -> "High"
-                                    AccuracyProfile.BATTERY_SAVER -> "Battery saver"
+                                    AccuracyProfile.STANDARD     -> stringResource(R.string.settings_accuracy_standard)
+                                    AccuracyProfile.HIGH         -> stringResource(R.string.settings_accuracy_high)
+                                    AccuracyProfile.BATTERY_SAVER -> stringResource(R.string.settings_accuracy_battery_saver)
                                 }
                             )
                         },
@@ -90,13 +92,13 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
         }
 
         // ── Gallery Scan Interval ─────────────────────────────────────────────
-        SettingsSection(title = "Gallery scan interval") {
+        SettingsSection(title = stringResource(R.string.settings_scan_interval_title)) {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 ScanInterval.entries.forEach { interval ->
                     FilterChip(
                         selected = scanInterval == interval,
                         onClick  = { viewModel.onScanIntervalSelected(interval) },
-                        label    = { Text("${interval.seconds} s") },
+                        label    = { Text(stringResource(R.string.settings_scan_interval_seconds, interval.seconds)) },
                     )
                 }
             }

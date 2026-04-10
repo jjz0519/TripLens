@@ -1,5 +1,6 @@
 package com.cooldog.triplens.export
 
+import com.cooldog.triplens.i18n.Strings
 import com.cooldog.triplens.repository.MediaRefRepository
 import com.cooldog.triplens.repository.NoteRepository
 import com.cooldog.triplens.repository.SessionRepository
@@ -55,18 +56,6 @@ class ExportUseCase(
 
     companion object {
         private const val LOG_TAG = "[TripLens/Export]"
-        const val README_CONTENT = """TripLens Export — schema_version: 1
-=====================================
-
-Contents:
-  index.json              Full trip data (groups, sessions, track points, notes)
-  tracks/session_*.gpx    GPX 1.1 track files per session, with transport mode extensions
-  notes/note_*.m4a        Voice note audio recordings
-
-To import into TripLens Desktop, open this .triplens file from File → Import.
-
-Format spec: https://github.com/triplens/triplens/blob/main/docs/TripLens-TDD.md
-"""
     }
 
     /**
@@ -154,8 +143,10 @@ Format spec: https://github.com/triplens/triplens/blob/main/docs/TripLens-TDD.md
             println("$LOG_TAG Step 5 done: ${voiceNotes.size} voice notes copied")
 
             // --- Step 6: Write README.txt ---
+            // Strings.exportReadmeContent is always English — the desktop import tool must
+            // be able to parse it regardless of the user's locale (see Strings.kt).
             println("$LOG_TAG Step 6: Writing README.txt")
-            fileSystem.writeText(fileSystem.joinPath(tempDir, "README.txt"), README_CONTENT)
+            fileSystem.writeText(fileSystem.joinPath(tempDir, "README.txt"), Strings.exportReadmeContent)
             println("$LOG_TAG Step 6 done")
 
             // --- Step 7: Zip ---

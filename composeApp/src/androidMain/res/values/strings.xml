@@ -1,3 +1,141 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">TripLens</string>
+
+    <!-- ── Shared actions ─────────────────────────────────────────────────── -->
+    <string name="action_cancel">Cancel</string>
+    <string name="action_rename">Rename</string>
+    <string name="action_delete">Delete</string>
+    <string name="action_export">Export</string>
+    <string name="action_back">Back</string>
+    <string name="action_open_settings">Open Settings</string>
+    <string name="action_more_options">More options</string>
+
+    <!-- ── Bottom navigation ─────────────────────────────────────────────── -->
+    <string name="nav_trips">Trips</string>
+    <string name="nav_record">Record</string>
+    <string name="nav_settings">Settings</string>
+
+    <!-- ── Onboarding ────────────────────────────────────────────────────── -->
+    <!-- Product name — intentionally not translated -->
+    <string name="onboarding_app_name" translatable="false">TripLens</string>
+    <string name="onboarding_subtitle">To record your trips, TripLens needs the following permissions:</string>
+    <string name="onboarding_permission_location_title">Location (Always)</string>
+    <string name="onboarding_permission_location_desc">Required to track your trip in the background</string>
+    <string name="onboarding_permission_mic_title">Microphone</string>
+    <string name="onboarding_permission_mic_desc">For recording voice notes during your trip</string>
+    <string name="onboarding_permission_photos_title">Photos &amp; Media</string>
+    <string name="onboarding_permission_photos_desc">To auto-index photos taken during your trip</string>
+    <string name="onboarding_permission_notifications_title">Notifications</string>
+    <string name="onboarding_permission_notifications_desc">To show the live recording status notification</string>
+    <string name="onboarding_location_denied">Location permission was denied. Please enable it in Settings to use TripLens.</string>
+    <string name="onboarding_grant_permissions">Grant Permissions</string>
+    <string name="onboarding_change_later">You can change these later in Settings</string>
+
+    <!-- ── Recording — idle ──────────────────────────────────────────────── -->
+    <!-- \n preserved to force two-line layout on the circular button -->
+    <string name="recording_start_button">Start\nRecording</string>
+
+    <!-- ── Recording — active ────────────────────────────────────────────── -->
+    <string name="recording_stop_button">Stop</string>
+    <string name="recording_stop_content_desc">Stop recording</string>
+    <string name="recording_stop_dialog_title">Stop Recording?</string>
+    <string name="recording_stop_dialog_message">The session will be saved. You can review it afterwards.</string>
+    <string name="recording_stop_dialog_confirm">Stop</string>
+    <string name="recording_text_note_button">Text Note</string>
+    <string name="recording_voice_note_button">Voice Note</string>
+    <string name="recording_recenter_button">Re-center</string>
+    <string name="recording_media_empty">Photos, videos, and notes appear here</string>
+    <string name="recording_voice_start_content_desc">Start voice recording</string>
+    <string name="recording_voice_stop_content_desc">Stop voice recording</string>
+    <string name="recording_text_note_title">Add Text Note</string>
+    <string name="recording_text_note_placeholder">What\'s happening here?</string>
+    <string name="recording_text_note_save">Save Note</string>
+
+    <!-- ── Permission rationale dialog ──────────────────────────────────── -->
+    <string name="permission_rationale_title">Location Permission Required</string>
+    <string name="permission_rationale_message">Background location access is required to track your trip. Please re-enable it in Settings.</string>
+
+    <!-- ── Trip List ─────────────────────────────────────────────────────── -->
+    <string name="trip_list_empty_title">No trips yet</string>
+    <string name="trip_list_empty_subtitle">Start recording to create your first trip</string>
+    <string name="trip_list_rename_title">Rename Trip</string>
+    <string name="trip_list_more_options">More options</string>
+
+    <!-- Plurals: "1 session" vs "3 sessions" -->
+    <plurals name="session_count">
+        <item quantity="one">%1$d session</item>
+        <item quantity="other">%1$d sessions</item>
+    </plurals>
+
+    <!-- ── Delete confirm dialog ─────────────────────────────────────────── -->
+    <string name="delete_confirm_title">Delete Trip</string>
+    <!-- %1$s = trip name -->
+    <string name="delete_confirm_message">Delete \"%1$s\" and all its sessions? This action cannot be undone.</string>
+
+    <!-- ── Trip Detail ───────────────────────────────────────────────────── -->
+    <!-- Fallback shown while loading or if group id is invalid -->
+    <string name="trip_detail_fallback_title">Trip Detail</string>
+    <string name="trip_detail_rename_session_title">Rename Session</string>
+    <string name="stat_distance">Distance</string>
+    <string name="stat_duration">Duration</string>
+    <string name="stat_sessions">Sessions</string>
+
+    <!-- ── Session Review ────────────────────────────────────────────────── -->
+    <!-- Fallback shown while loading -->
+    <string name="session_review_fallback_title">Session Review</string>
+    <string name="transport_stationary">Stationary</string>
+    <string name="transport_walking">Walking</string>
+    <string name="transport_cycling">Cycling</string>
+    <string name="transport_driving">Driving</string>
+    <string name="transport_fast_transit">Fast Transit</string>
+    <string name="media_type_photo">Photo</string>
+    <string name="media_type_video">Video</string>
+    <string name="media_type_note">Note</string>
+    <!-- %1$d = minutes, %2$02d = zero-padded seconds -->
+    <string name="media_type_voice_note_format">Voice note — %1$d:%2$02d</string>
+
+    <!-- ── Media Preview Sheet ───────────────────────────────────────────── -->
+    <string name="media_preview_photo_content_desc">Photo preview</string>
+    <string name="media_preview_video_content_desc">Video poster frame</string>
+    <string name="media_preview_voice_note_title">Voice Note</string>
+    <string name="media_preview_play_content_desc">Play</string>
+    <string name="media_preview_pause_content_desc">Pause</string>
+    <string name="media_preview_note_title">Note</string>
+
+    <!-- ── Media item cards ──────────────────────────────────────────────── -->
+    <string name="media_card_photo_content_desc">Photo</string>
+    <string name="media_card_video_content_desc">Video thumbnail</string>
+
+    <!-- ── Settings ─────────────────────────────────────────────────────── -->
+    <string name="settings_language_title">Language</string>
+    <string name="settings_accuracy_title">GPS accuracy</string>
+    <string name="settings_scan_interval_title">Gallery scan interval</string>
+    <!-- Language chip labels — native-script names intentionally left in their own script -->
+    <string name="settings_language_system">System default</string>
+    <!-- "English" is always displayed in English regardless of UI language -->
+    <string name="settings_language_en" translatable="false">English</string>
+    <!-- Simplified Chinese label — always displayed in Chinese -->
+    <string name="settings_language_zh_cn" translatable="false">简体中文</string>
+    <string name="settings_accuracy_standard">Standard</string>
+    <string name="settings_accuracy_high">High</string>
+    <string name="settings_accuracy_battery_saver">Battery saver</string>
+    <!-- %1$d = interval in seconds -->
+    <string name="settings_scan_interval_seconds">%1$d s</string>
+
+    <!-- ── Notification channel ──────────────────────────────────────────── -->
+    <string name="notification_recording_channel_name">TripLens Recording</string>
+    <string name="notification_recording_channel_desc">Shown while TripLens is recording a trip</string>
+
+    <!-- ── ViewModel user-facing labels (injected via Deps) ─────────────── -->
+    <string name="no_sessions">No sessions</string>
+    <string name="session_in_progress">In progress</string>
+    <string name="trip_not_found">Trip not found</string>
+    <string name="session_not_found">Session not found</string>
+
+    <!-- ── Shared module (Strings.kt expect/actual) ──────────────────────── -->
+    <!-- Date format used as the default name for new TripGroups -->
+    <string name="default_trip_name_format" translatable="false">yyyy-MM-dd</string>
+    <!-- Default name for a new recording session -->
+    <string name="session_default_name">Session</string>
 </resources>

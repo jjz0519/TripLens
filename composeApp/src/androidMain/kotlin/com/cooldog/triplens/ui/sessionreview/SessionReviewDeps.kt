@@ -39,6 +39,12 @@ data class SessionReviewDeps(
      */
     val getAudioFilePathFn: (filename: String) -> String,
 
+    /**
+     * Localised error message shown in [SessionReviewViewModel.UiState.Error] when the session
+     * ID from the navigation route does not match any session in the database.
+     */
+    val sessionNotFoundMessage: String = "Session not found",
+
     /** Injected so tests pass `{ FIXED_EPOCH }` for deterministic timestamps. */
     val clock: () -> Long = { System.currentTimeMillis() },
 

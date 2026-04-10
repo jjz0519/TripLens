@@ -23,9 +23,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import com.cooldog.triplens.R
 import coil3.request.ImageRequest
 import coil3.video.VideoFrameDecoder
 import com.cooldog.triplens.ui.recording.MediaItem
@@ -60,7 +62,7 @@ internal fun PhotoCard(contentUri: String, isVideo: Boolean) {
         Box {
             AsyncImage(
                 model = model,
-                contentDescription = if (isVideo) "Video thumbnail" else "Photo",
+                contentDescription = if (isVideo) stringResource(R.string.media_card_video_content_desc) else stringResource(R.string.media_card_photo_content_desc),
                 contentScale = ContentScale.FillHeight,
                 modifier = Modifier.height(64.dp),
             )

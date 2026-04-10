@@ -44,8 +44,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.cooldog.triplens.R
 import com.cooldog.triplens.ui.common.RenameDialog
 import com.cooldog.triplens.ui.common.formatDistance
 import com.cooldog.triplens.ui.common.formatDuration
@@ -87,7 +89,7 @@ fun TripDetailScreen(
     renameTarget?.let { item ->
         RenameDialog(
             currentName = item.name,
-            title = "Rename Session",
+            title = stringResource(R.string.trip_detail_rename_session_title),
             onConfirm = { newName ->
                 viewModel.onRenameSession(item.id, newName)
                 renameTarget = null
@@ -104,7 +106,7 @@ fun TripDetailScreen(
             TopAppBar(
                 title = {
                     Text(
-                        text = loadedState?.groupName ?: "Trip Detail",
+                        text = loadedState?.groupName ?: stringResource(R.string.trip_detail_fallback_title),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -113,7 +115,7 @@ fun TripDetailScreen(
                     IconButton(onClick = onBack) {
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back",
+                            contentDescription = stringResource(R.string.action_back),
                         )
                     }
                 },
@@ -122,7 +124,7 @@ fun TripDetailScreen(
                     IconButton(onClick = { viewModel.onExportGroup() }) {
                         Icon(
                             Icons.Default.FileDownload,
-                            contentDescription = "Export",
+                            contentDescription = stringResource(R.string.action_export),
                         )
                     }
                 },
@@ -208,10 +210,10 @@ private fun GroupStatsHeader(
                 .padding(16.dp),
             horizontalArrangement = Arrangement.SpaceEvenly,
         ) {
-            StatColumn(label = "Distance", value = formatDistance(totalDistance))
-            StatColumn(label = "Duration", value = formatDuration(totalDuration))
+            StatColumn(label = stringResource(R.string.stat_distance), value = formatDistance(totalDistance))
+            StatColumn(label = stringResource(R.string.stat_duration), value = formatDuration(totalDuration))
             StatColumn(
-                label = "Sessions",
+                label = stringResource(R.string.stat_sessions),
                 value = sessionCount.toString(),
             )
         }
@@ -311,7 +313,7 @@ private fun SessionRow(
                 IconButton(onClick = { showMenu = true }) {
                     Icon(
                         Icons.Default.MoreVert,
-                        contentDescription = "More options",
+                        contentDescription = stringResource(R.string.trip_list_more_options),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
@@ -320,7 +322,7 @@ private fun SessionRow(
                     onDismissRequest = { showMenu = false },
                 ) {
                     DropdownMenuItem(
-                        text = { Text("Rename") },
+                        text = { Text(stringResource(R.string.action_rename)) },
                         onClick = {
                             showMenu = false
                             onRename()

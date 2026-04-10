@@ -111,7 +111,7 @@ class TripDetailViewModel(private val deps: TripDetailDeps) : ViewModel() {
                 val group = withContext(deps.ioDispatcher) {
                     deps.getGroupByIdFn(deps.groupId)
                 } ?: run {
-                    _uiState.value = UiState.Error("Trip not found")
+                    _uiState.value = UiState.Error(deps.tripNotFoundMessage)
                     return@launch
                 }
 
@@ -188,7 +188,7 @@ class TripDetailViewModel(private val deps: TripDetailDeps) : ViewModel() {
         val startDate = dateFmt.format(Date(startMs))
         val startTime = timeFmt.format(Date(startMs))
 
-        if (endMs == null) return "$startDate, $startTime – In progress"
+        if (endMs == null) return "$startDate, $startTime – ${deps.sessionInProgressLabel}"
 
         val endDate = dateFmt.format(Date(endMs))
         val endTime = timeFmt.format(Date(endMs))

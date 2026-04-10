@@ -35,6 +35,13 @@ data class TripListDeps(
      */
     val exportFn: suspend (groupId: String, nowMs: Long) -> ExportResult,
 
+    /**
+     * Localised label returned by [TripListViewModel.formatDateRange] when a group has no
+     * sessions yet (no start date available). Injected so tests can assert against a fixed
+     * string without depending on Android resources.
+     */
+    val noSessionsLabel: String = "No sessions",
+
     /** Injected so tests pass `{ FIXED_EPOCH }` for deterministic timestamps. */
     val clock: () -> Long = { System.currentTimeMillis() },
 

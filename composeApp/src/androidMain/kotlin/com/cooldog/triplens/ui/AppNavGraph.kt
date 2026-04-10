@@ -16,6 +16,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import com.cooldog.triplens.R
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
@@ -158,8 +160,8 @@ private fun AppBottomNavBar(
     if (showBottomBar) {
         NavigationBar {
             NavigationBarItem(
-                icon = { Icon(Icons.Default.Map, contentDescription = "Trips") },
-                label = { Text("Trips") },
+                icon = { Icon(Icons.Default.Map, contentDescription = stringResource(R.string.nav_trips)) },
+                label = { Text(stringResource(R.string.nav_trips)) },
                 selected = currentDestination?.hasRoute<TripListRoute>() ?: false,
                 onClick = { navigateTopLevel(navController, TripListRoute) },
             )
@@ -167,16 +169,16 @@ private fun AppBottomNavBar(
                 icon = {
                     Icon(
                         Icons.Default.Mic,
-                        contentDescription = "Record",
+                        contentDescription = stringResource(R.string.nav_record),
                     )
                 },
-                label = { Text("Record") },
+                label = { Text(stringResource(R.string.nav_record)) },
                 selected = currentDestination?.hasRoute<RecordingRoute>() ?: false,
                 onClick = { navigateTopLevel(navController, RecordingRoute) },
             )
             NavigationBarItem(
-                icon = { Icon(Icons.Default.Settings, contentDescription = "Settings") },
-                label = { Text("Settings") },
+                icon = { Icon(Icons.Default.Settings, contentDescription = stringResource(R.string.nav_settings)) },
+                label = { Text(stringResource(R.string.nav_settings)) },
                 selected = currentDestination?.hasRoute<SettingsRoute>() ?: false,
                 onClick = { navigateTopLevel(navController, SettingsRoute) },
             )

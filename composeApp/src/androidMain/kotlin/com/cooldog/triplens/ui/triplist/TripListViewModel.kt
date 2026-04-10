@@ -172,7 +172,7 @@ class TripListViewModel(private val deps: TripListDeps) : ViewModel() {
      * - No dates: "No sessions"
      */
     private fun formatDateRange(earliestMs: Long?, latestMs: Long?): String {
-        if (earliestMs == null) return "No sessions"
+        if (earliestMs == null) return deps.noSessionsLabel
         val dayFmt = SimpleDateFormat("MMM d", Locale.getDefault())
         val fullFmt = SimpleDateFormat("MMM d, yyyy", Locale.getDefault())
         val startStr = dayFmt.format(Date(earliestMs))

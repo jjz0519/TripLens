@@ -4,6 +4,8 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.stringResource
+import com.cooldog.triplens.R
 
 /**
  * Confirmation dialog for destructive delete actions.
@@ -21,15 +23,15 @@ fun DeleteConfirmDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Delete Trip") },
+        title = { Text(stringResource(R.string.delete_confirm_title)) },
         text = {
-            Text("Delete \"$itemName\" and all its sessions? This action cannot be undone.")
+            Text(stringResource(R.string.delete_confirm_message, itemName))
         },
         confirmButton = {
-            TextButton(onClick = onConfirm) { Text("Delete") }
+            TextButton(onClick = onConfirm) { Text(stringResource(R.string.action_delete)) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
         },
     )
 }

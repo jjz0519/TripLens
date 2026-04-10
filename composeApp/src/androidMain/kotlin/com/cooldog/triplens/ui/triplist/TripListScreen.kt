@@ -42,8 +42,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.cooldog.triplens.R
 import com.cooldog.triplens.ui.common.DeleteConfirmDialog
 import com.cooldog.triplens.ui.common.RenameDialog
 import com.cooldog.triplens.ui.common.formatDistance
@@ -84,7 +87,7 @@ fun TripListScreen(
     renameTarget?.let { item ->
         RenameDialog(
             currentName = item.name,
-            title = "Rename Trip",
+            title = stringResource(R.string.trip_list_rename_title),
             onConfirm = { newName ->
                 viewModel.onRenameGroup(item.id, newName)
                 renameTarget = null
@@ -129,13 +132,13 @@ fun TripListScreen(
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
                         Text(
-                            text = "No trips yet",
+                            text = stringResource(R.string.trip_list_empty_title),
                             style = MaterialTheme.typography.titleLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         Spacer(Modifier.height(8.dp))
                         Text(
-                            text = "Start recording to create your first trip",
+                            text = stringResource(R.string.trip_list_empty_subtitle),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -260,7 +263,7 @@ private fun TripGroupCard(
                 // Distance and session count
                 Text(
                     text = formatDistance(item.totalDistanceMeters) +
-                            " · ${item.sessionCount} session${if (item.sessionCount != 1L) "s" else ""}",
+                            " · " + pluralStringResource(R.plurals.session_count, item.sessionCount.toInt(), item.sessionCount),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -286,7 +289,7 @@ private fun TripGroupCard(
                 IconButton(onClick = { showMenu = true }) {
                     Icon(
                         Icons.Default.MoreVert,
-                        contentDescription = "More options",
+                        contentDescription = stringResource(R.string.trip_list_more_options),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
@@ -295,7 +298,7 @@ private fun TripGroupCard(
                     onDismissRequest = { showMenu = false },
                 ) {
                     DropdownMenuItem(
-                        text = { Text("Rename") },
+                        text = { Text(stringResource(R.string.action_rename)) },
                         onClick = {
                             showMenu = false
                             onRename()
@@ -305,7 +308,7 @@ private fun TripGroupCard(
                         },
                     )
                     DropdownMenuItem(
-                        text = { Text("Export") },
+                        text = { Text(stringResource(R.string.action_export)) },
                         onClick = {
                             showMenu = false
                             onExport()
@@ -317,7 +320,7 @@ private fun TripGroupCard(
                     DropdownMenuItem(
                         text = {
                             Text(
-                                "Delete",
+                                stringResource(R.string.action_delete),
                                 color = MaterialTheme.colorScheme.error,
                             )
                         },

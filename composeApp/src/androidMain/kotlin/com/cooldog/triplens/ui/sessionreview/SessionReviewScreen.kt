@@ -51,9 +51,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import com.cooldog.triplens.R
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.cooldog.triplens.domain.Segment
@@ -164,7 +166,7 @@ fun SessionReviewScreen(
     Scaffold(
         topBar = {
             val sessionName = (uiState as? SessionReviewViewModel.UiState.Loaded)
-                ?.session?.name ?: "Session Review"
+                ?.session?.name ?: stringResource(R.string.session_review_fallback_title)
             TopAppBar(
                 title = {
                     Text(
@@ -175,7 +177,7 @@ fun SessionReviewScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.action_back))
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -403,8 +405,8 @@ private fun SessionStatsHeader(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly,
             ) {
-                StatColumn(label = "Distance", value = formatDistance(totalDistance))
-                StatColumn(label = "Duration", value = formatDuration(durationSeconds))
+                StatColumn(label = stringResource(R.string.stat_distance), value = formatDistance(totalDistance))
+                StatColumn(label = stringResource(R.string.stat_duration), value = formatDuration(durationSeconds))
             }
             if (transportBreakdown.isNotEmpty()) {
                 Spacer(Modifier.height(8.dp))
@@ -472,6 +474,15 @@ private fun SegmentCard(segment: Segment) {
     }
 }
 
+@Composable
+private fun modeLabel(mode: TransportMode): String = when (mode) {
+    TransportMode.STATIONARY   -> stringResource(R.string.transport_stationary)
+    TransportMode.WALKING      -> stringResource(R.string.transport_walking)
+    TransportMode.CYCLING      -> stringResource(R.string.transport_cycling)
+    TransportMode.DRIVING      -> stringResource(R.string.transport_driving)
+    TransportMode.FAST_TRANSIT -> stringResource(R.string.transport_fast_transit)
+}
+
 /**
  * A tappable media/note entry row in the timeline.
  *
@@ -518,16 +529,18 @@ private fun MediaEntryRow(
             )
 
             // Type-specific label
+            // Voice note uses stringResource(id, args) — routes through Android's Resources.getString()
+            // which respects locale and avoids JVM-default-locale number formatting via String.format().
             Text(
                 text = when (val item = entry.item) {
-                    is MediaItem.Photo     -> "Photo"
-                    is MediaItem.Video     -> "Video"
-                    is MediaItem.TextNote  -> item.preview.ifEmpty { "Note" }
-                    is MediaItem.VoiceNote -> {
-                        val m = item.durationSeconds / 60
-                        val s = item.durationSeconds % 60
-                        "Voice note — %d:%02d".format(m, s)
-                    }
+                    is MediaItem.Photo     -> stringResource(R.string.media_type_photo)
+                    is MediaItem.Video     -> stringResource(R.string.media_type_video)
+                    is MediaItem.TextNote  -> item.preview.ifEmpty { stringResource(R.string.media_type_note) }
+                    is MediaItem.VoiceNote -> stringResource(
+                        R.string.media_type_voice_note_format,
+                        item.durationSeconds / 60,
+                        item.durationSeconds % 60,
+                    )
                 },
                 style = MaterialTheme.typography.bodySmall,
                 maxLines = 1,
@@ -601,11 +614,4 @@ private const val TAG = "TripLens/SessionReview"
 
 // ── Formatting helpers ────────────────────────────────────────────────────────────────
 // formatDistance, formatDuration, modeEmoji are imported from ui/common/FormatUtils.kt
-
-private fun modeLabel(mode: TransportMode): String = when (mode) {
-    TransportMode.STATIONARY   -> "Stationary"
-    TransportMode.WALKING      -> "Walking"
-    TransportMode.CYCLING      -> "Cycling"
-    TransportMode.DRIVING      -> "Driving"
-    TransportMode.FAST_TRANSIT -> "Fast Transit"
-}
+// modeLabel is defined above as a @Composable function using stringResource()

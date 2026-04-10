@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">TripLens</string>
+
+    <!-- ── Shared actions ─────────────────────────────────────────────────── -->
+    <string name="action_cancel">取消</string>
+    <string name="action_rename">重命名</string>
+    <string name="action_delete">删除</string>
+    <string name="action_export">导出</string>
+    <string name="action_back">返回</string>
+    <string name="action_open_settings">打开设置</string>
+    <string name="action_more_options">更多选项</string>
+
+    <!-- ── Bottom navigation ─────────────────────────────────────────────── -->
+    <string name="nav_trips">行程</string>
+    <string name="nav_record">录制</string>
+    <string name="nav_settings">设置</string>
+
+    <!-- ── Onboarding ────────────────────────────────────────────────────── -->
+    <string name="onboarding_subtitle">要记录您的行程，TripLens 需要以下权限：</string>
+    <string name="onboarding_permission_location_title">位置（始终）</string>
+    <string name="onboarding_permission_location_desc">在后台追踪您的行程所必需</string>
+    <string name="onboarding_permission_mic_title">麦克风</string>
+    <string name="onboarding_permission_mic_desc">在行程中录制语音备注</string>
+    <string name="onboarding_permission_photos_title">照片与媒体</string>
+    <string name="onboarding_permission_photos_desc">自动索引行程中拍摄的照片</string>
+    <string name="onboarding_permission_notifications_title">通知</string>
+    <string name="onboarding_permission_notifications_desc">显示实时录制状态通知</string>
+    <string name="onboarding_location_denied">位置权限被拒绝，请在设置中启用以使用 TripLens。</string>
+    <string name="onboarding_grant_permissions">授予权限</string>
+    <string name="onboarding_change_later">您可以稍后在设置中更改</string>
+
+    <!-- ── Recording — idle ──────────────────────────────────────────────── -->
+    <string name="recording_start_button">开始\n录制</string>
+
+    <!-- ── Recording — active ────────────────────────────────────────────── -->
+    <string name="recording_stop_button">停止</string>
+    <string name="recording_stop_content_desc">停止录制</string>
+    <string name="recording_stop_dialog_title">停止录制？</string>
+    <string name="recording_stop_dialog_message">本次记录将被保存，您可以稍后查看。</string>
+    <string name="recording_stop_dialog_confirm">停止</string>
+    <string name="recording_text_note_button">文字备注</string>
+    <string name="recording_voice_note_button">语音备注</string>
+    <string name="recording_recenter_button">重新定位</string>
+    <string name="recording_media_empty">照片、视频和备注将显示在此处</string>
+    <string name="recording_voice_start_content_desc">开始语音录制</string>
+    <string name="recording_voice_stop_content_desc">停止语音录制</string>
+    <string name="recording_text_note_title">添加文字备注</string>
+    <string name="recording_text_note_placeholder">在这里发生了什么？</string>
+    <string name="recording_text_note_save">保存备注</string>
+
+    <!-- ── Permission rationale dialog ──────────────────────────────────── -->
+    <string name="permission_rationale_title">需要位置权限</string>
+    <string name="permission_rationale_message">追踪行程需要后台位置权限，请在设置中重新启用。</string>
+
+    <!-- ── Trip List ─────────────────────────────────────────────────────── -->
+    <string name="trip_list_empty_title">暂无行程</string>
+    <string name="trip_list_empty_subtitle">开始录制以创建您的第一次行程</string>
+    <string name="trip_list_rename_title">重命名行程</string>
+    <string name="trip_list_more_options">更多选项</string>
+
+    <!-- Chinese has no grammatical plural — both forms use the same pattern -->
+    <plurals name="session_count">
+        <item quantity="other">%1$d 条记录</item>
+    </plurals>
+
+    <!-- ── Delete confirm dialog ─────────────────────────────────────────── -->
+    <string name="delete_confirm_title">删除行程</string>
+    <string name="delete_confirm_message">删除「%1$s」及其所有记录？此操作无法撤销。</string>
+
+    <!-- ── Trip Detail ───────────────────────────────────────────────────── -->
+    <string name="trip_detail_fallback_title">行程详情</string>
+    <string name="trip_detail_rename_session_title">重命名记录</string>
+    <string name="stat_distance">距离</string>
+    <string name="stat_duration">时长</string>
+    <string name="stat_sessions">记录</string>
+
+    <!-- ── Session Review ────────────────────────────────────────────────── -->
+    <string name="session_review_fallback_title">行程回顾</string>
+    <string name="transport_stationary">静止</string>
+    <string name="transport_walking">步行</string>
+    <string name="transport_cycling">骑行</string>
+    <string name="transport_driving">驾车</string>
+    <string name="transport_fast_transit">高速交通</string>
+    <string name="media_type_photo">照片</string>
+    <string name="media_type_video">视频</string>
+    <string name="media_type_note">备注</string>
+    <string name="media_type_voice_note_format">语音备注 — %1$d:%2$02d</string>
+
+    <!-- ── Media Preview Sheet ───────────────────────────────────────────── -->
+    <string name="media_preview_photo_content_desc">照片预览</string>
+    <string name="media_preview_video_content_desc">视频封面</string>
+    <string name="media_preview_voice_note_title">语音备注</string>
+    <string name="media_preview_play_content_desc">播放</string>
+    <string name="media_preview_pause_content_desc">暂停</string>
+    <string name="media_preview_note_title">备注</string>
+
+    <!-- ── Media item cards ──────────────────────────────────────────────── -->
+    <string name="media_card_photo_content_desc">照片</string>
+    <string name="media_card_video_content_desc">视频缩略图</string>
+
+    <!-- ── Settings ─────────────────────────────────────────────────────── -->
+    <string name="settings_language_title">语言</string>
+    <string name="settings_accuracy_title">GPS 精度</string>
+    <string name="settings_scan_interval_title">相册扫描间隔</string>
+    <string name="settings_language_system">跟随系统</string>
+    <string name="settings_accuracy_standard">标准</string>
+    <string name="settings_accuracy_high">高精度</string>
+    <string name="settings_accuracy_battery_saver">省电</string>
+    <string name="settings_scan_interval_seconds">%1$d 秒</string>
+
+    <!-- ── Notification channel ──────────────────────────────────────────── -->
+    <string name="notification_recording_channel_name">TripLens 录制</string>
+    <string name="notification_recording_channel_desc">录制行程时显示</string>
+
+    <!-- ── ViewModel user-facing labels ─────────────────────────────────── -->
+    <string name="no_sessions">暂无记录</string>
+    <string name="session_in_progress">进行中</string>
+    <string name="trip_not_found">找不到行程</string>
+    <string name="session_not_found">找不到记录</string>
+
+    <!-- ── Shared module (Strings.kt) ────────────────────────────────────── -->
+    <string name="session_default_name">记录</string>
+</resources>

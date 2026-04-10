@@ -1,5 +1,6 @@
 package com.cooldog.triplens.export
 
+import com.cooldog.triplens.i18n.Strings
 import com.cooldog.triplens.model.Session
 import com.cooldog.triplens.model.TrackPoint
 import kotlinx.datetime.Instant
@@ -41,7 +42,7 @@ object GpxWriter {
      */
     fun write(session: Session, points: List<TrackPoint>): String = buildString {
         appendLine("""<?xml version="1.0" encoding="UTF-8"?>""")
-        append("""<gpx version="1.1" creator="TripLens"""")
+        append("""<gpx version="1.1" creator="${Strings.gpxCreatorTag}"""")
         append(""" xmlns="$GPX_NAMESPACE"""")
         append(""" xmlns:triplens="$TRIPLENS_NS_URI"""")
         append(""" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"""")

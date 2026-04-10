@@ -2,6 +2,7 @@ package com.cooldog.triplens.di
 
 import android.content.Intent
 import androidx.appcompat.app.AppCompatDelegate
+import com.cooldog.triplens.R
 import androidx.core.content.ContextCompat
 import androidx.core.os.LocaleListCompat
 import com.cooldog.triplens.data.AppPreferences
@@ -182,7 +183,14 @@ val androidModule = module {
 
     // ── TripListViewModel ─────────────────────────────────────────────────────
     // Loads all groups with aggregate stats and exposes rename/delete/export actions.
+    //
+    // Locale note: user-facing label strings (noSessionsLabel, etc.) are resolved once
+    // at ViewModel construction time via androidContext(). This is correct because Koin's
+    // viewModel {} factory re-runs after every Activity recreation — and AppCompatDelegate
+    // applies the per-app locale to the Application context before the Activity recreates,
+    // so the new locale is always in effect by the time this factory is called again.
     viewModel {
+        val ctx = androidContext()
         TripListViewModel(
             deps = TripListDeps(
                 getAllGroupsWithStatsFn = { get<TripRepository>().getAllGroupsWithStats() },
@@ -197,6 +205,7 @@ val androidModule = module {
                 exportFn = { groupId, nowMs ->
                     get<ExportUseCase>().export(groupId, nowMs)
                 },
+                noSessionsLabel = ctx.getString(R.string.no_sessions),
             )
         )
     }
@@ -218,6 +227,7 @@ val androidModule = module {
                 getAudioFilePathFn = { filename ->
                     ctx.filesDir.resolve("notes/$filename").absolutePath
                 },
+                sessionNotFoundMessage = ctx.getString(R.string.session_not_found),
             )
         )
     }
@@ -226,6 +236,7 @@ val androidModule = module {
     // Receives groupId via Koin's parametersOf() — cross-platform KMP API.
     viewModel { params ->
         val groupId: String = params.get()
+        val ctx = androidContext()
         TripDetailViewModel(
             deps = TripDetailDeps(
                 groupId = groupId,
@@ -238,6 +249,8 @@ val androidModule = module {
                 exportFn = { gId, nowMs ->
                     get<ExportUseCase>().export(gId, nowMs)
                 },
+                sessionInProgressLabel = ctx.getString(R.string.session_in_progress),
+                tripNotFoundMessage    = ctx.getString(R.string.trip_not_found),
             )
         )
     }

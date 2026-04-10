@@ -17,7 +17,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.cooldog.triplens.R
 
 /**
  * Reusable rename dialog used by both TripListScreen (rename group) and
@@ -63,10 +65,10 @@ fun RenameDialog(
                 onClick = { onConfirm(text.trim()) },
                 // Prevent empty names — the button is disabled while the field is blank.
                 enabled = text.isNotBlank(),
-            ) { Text("Rename") }
+            ) { Text(stringResource(R.string.action_rename)) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
         },
     )
 }

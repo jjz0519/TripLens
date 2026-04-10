@@ -148,7 +148,7 @@ class SessionReviewViewModel(private val deps: SessionReviewDeps) : ViewModel() 
                     deps.getSessionFn(deps.sessionId)
                 } ?: run {
                     Log.e(TAG, "Session not found: id=${deps.sessionId}")
-                    _uiState.value = UiState.Error("Session not found")
+                    _uiState.value = UiState.Error(deps.sessionNotFoundMessage)
                     return@launch
                 }
 
