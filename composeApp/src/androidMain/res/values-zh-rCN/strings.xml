@@ -119,6 +119,12 @@
     <string name="trip_not_found">找不到行程</string>
     <string name="session_not_found">找不到记录</string>
 
+    <!-- ── Session recovery dialog ──────────────────────────────────────── -->
+    <string name="recovery_dialog_title">录制中断</string>
+    <string name="recovery_dialog_message">上次录制意外中断，是否继续录制或丢弃本次记录？</string>
+    <string name="recovery_action_resume">继续录制</string>
+    <string name="recovery_action_discard">丢弃</string>
+
     <!-- ── Shared module (Strings.kt) ────────────────────────────────────── -->
     <string name="session_default_name">记录</string>
 </resources>

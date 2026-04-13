@@ -40,8 +40,9 @@ import kotlin.math.sqrt
 private const val TAG = "TripLens/LocationService"
 
 private const val NOTIFICATION_ID         = 1001
-private const val PREFS_NAME              = "triplens_service"
-private const val PREFS_SESSION_ID        = "active_session_id"
+// Aliases so service body code keeps using the short names without change.
+private val PREFS_NAME       = LocationTrackingService.PREFS_NAME
+private val PREFS_SESSION_ID = LocationTrackingService.PREFS_SESSION_ID
 private const val PREFS_PROFILE           = "accuracy_profile"
 private const val PREFS_SESSION_START_TIME = "session_start_time"
 // Flush every point immediately so the ViewModel's 3-second poll always finds recent data.
@@ -640,5 +641,10 @@ class LocationTrackingService : Service() {
          */
         @Volatile
         internal var runningInstance: LocationTrackingService? = null
+
+        // SharedPreferences keys — internal so AppViewModel can detect whether the
+        // service persisted its session (used for orphaned-session recovery at startup).
+        internal const val PREFS_NAME       = "triplens_service"
+        internal const val PREFS_SESSION_ID = "active_session_id"
     }
 }

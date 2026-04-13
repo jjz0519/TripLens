@@ -14,16 +14,18 @@ import org.junit.After
 import org.junit.Before
 import org.junit.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
+import kotlin.test.assertNotNull
 
 /**
- * Unit tests for [AppViewModel]'s start destination logic.
+ * Unit tests for [AppViewModel]'s start destination logic and orphaned session recovery.
  *
  * Uses [StandardTestDispatcher] so coroutines don't execute until [advanceUntilIdle] is called.
  * This allows verifying both the initial [AppViewModel.StartDestination.Loading] state and
  * the resolved state after the IO query completes.
  *
- * No database or Koin is needed: [AppViewModel] accepts lambdas for [getActiveSessionFn] and
- * [isOnboardingCompleteFn] so tests supply pure functions rather than real dependencies.
+ * No database or Koin is needed: [AppViewModel] accepts lambdas for all injectable behavior
+ * so tests supply pure functions rather than real dependencies.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class AppViewModelTest {
@@ -49,10 +51,16 @@ class AppViewModelTest {
     private fun buildViewModel(
         activeSession: Session?,
         isOnboardingComplete: Boolean = true,  // default keeps existing tests unaffected
+        isServiceRunning: Boolean = false,
+        resumeOrphanedSessionFn: suspend (String, String) -> Unit = { _, _ -> },
+        discardOrphanedSessionFn: (String) -> Unit = {},
     ): AppViewModel = AppViewModel(
-        getActiveSessionFn = { activeSession },
-        isOnboardingCompleteFn = { isOnboardingComplete },
-        ioDispatcher = testDispatcher,
+        getActiveSessionFn       = { activeSession },
+        isOnboardingCompleteFn   = { isOnboardingComplete },
+        isServiceRunningFn       = { isServiceRunning },
+        resumeOrphanedSessionFn  = resumeOrphanedSessionFn,
+        discardOrphanedSessionFn = discardOrphanedSessionFn,
+        ioDispatcher             = testDispatcher,
     )
 
     private val aRecordingSession = Session(
@@ -91,13 +99,13 @@ class AppViewModelTest {
     }
 
     @Test
-    fun startDestination_isRecording_whenActiveSessionExists() = runTest(testDispatcher) {
-        val vm = buildViewModel(activeSession = aRecordingSession)
+    fun startDestination_isRecording_whenActiveSessionExistsAndServiceRunning() = runTest(testDispatcher) {
+        val vm = buildViewModel(activeSession = aRecordingSession, isServiceRunning = true)
         advanceUntilIdle()
         assertEquals(
             AppViewModel.StartDestination.Recording,
             vm.startDestination.value,
-            "startDestination must be Recording when getActiveSession returns a non-null session",
+            "startDestination must be Recording when getActiveSession returns a session and service is running",
         )
     }
 
@@ -137,8 +145,115 @@ class AppViewModelTest {
 
     @Test
     fun startDestination_isRecording_whenOnboardingCompleteAndSessionActive() = runTest(testDispatcher) {
-        val vm = buildViewModel(activeSession = aRecordingSession, isOnboardingComplete = true)
+        val vm = buildViewModel(
+            activeSession        = aRecordingSession,
+            isOnboardingComplete = true,
+            isServiceRunning     = true,
+        )
         advanceUntilIdle()
         assertEquals(AppViewModel.StartDestination.Recording, vm.startDestination.value)
+    }
+
+    // ------------------------------------------------------------------
+    // Orphaned session recovery (Task 18)
+    // ------------------------------------------------------------------
+
+    @Test
+    fun recoverySession_isSet_whenSessionExistsButServiceNotRunning() = runTest(testDispatcher) {
+        // Session in DB but service is gone (neither runningInstance nor SharedPrefs marker).
+        val vm = buildViewModel(activeSession = aRecordingSession, isServiceRunning = false)
+        advanceUntilIdle()
+        assertNotNull(
+            vm.recoverySession.value,
+            "recoverySession must be non-null when session exists but service is not running",
+        )
+        assertEquals(
+            AppViewModel.StartDestination.TripList,
+            vm.startDestination.value,
+            "startDestination must be TripList (not Recording) when an orphaned session is detected",
+        )
+    }
+
+    @Test
+    fun onRecoveryResume_navigatesToRecordingAndClearsDialog() = runTest(testDispatcher) {
+        val resumeCalls = mutableListOf<Pair<String, String>>()
+        val vm = buildViewModel(
+            activeSession           = aRecordingSession,
+            isServiceRunning        = false,
+            resumeOrphanedSessionFn = { orphanId, groupId -> resumeCalls += orphanId to groupId },
+        )
+        advanceUntilIdle()
+        assertNotNull(vm.recoverySession.value, "precondition: recovery dialog should be showing")
+
+        vm.onRecoveryResume()
+        advanceUntilIdle()
+
+        assertNull(vm.recoverySession.value, "recoverySession must be null after Resume")
+        assertEquals(
+            AppViewModel.StartDestination.Recording,
+            vm.startDestination.value,
+            "startDestination must switch to Recording after Resume",
+        )
+        assertEquals(1, resumeCalls.size, "resumeOrphanedSessionFn must be called exactly once")
+        assertEquals("s1" to "g1", resumeCalls.first(), "resumeOrphanedSessionFn called with correct ids")
+    }
+
+    @Test
+    fun onRecoveryDiscard_staysOnTripListAndClearsDialog() = runTest(testDispatcher) {
+        val discardCalls = mutableListOf<String>()
+        val vm = buildViewModel(
+            activeSession            = aRecordingSession,
+            isServiceRunning         = false,
+            discardOrphanedSessionFn = { orphanId -> discardCalls += orphanId },
+        )
+        advanceUntilIdle()
+        assertNotNull(vm.recoverySession.value, "precondition: recovery dialog should be showing")
+
+        vm.onRecoveryDiscard()
+        advanceUntilIdle()
+
+        assertNull(vm.recoverySession.value, "recoverySession must be null after Discard")
+        assertEquals(
+            AppViewModel.StartDestination.TripList,
+            vm.startDestination.value,
+            "startDestination must remain TripList after Discard",
+        )
+        assertEquals(1, discardCalls.size, "discardOrphanedSessionFn must be called exactly once")
+        assertEquals("s1", discardCalls.first(), "discardOrphanedSessionFn called with correct session id")
+    }
+
+    @Test
+    fun onRecoveryResume_resumeFnThrows_dialogRemainsVisibleForRetry() = runTest(testDispatcher) {
+        // If resumeOrphanedSessionFn fails (e.g. service start denied), the dialog must stay
+        // visible so the user can retry or choose Discard — the orphaned session must not be
+        // silently dropped, which would cause it to re-appear on every cold start instead.
+        val vm = buildViewModel(
+            activeSession           = aRecordingSession,
+            isServiceRunning        = false,
+            resumeOrphanedSessionFn = { _, _ -> throw RuntimeException("Service start failed") },
+        )
+        advanceUntilIdle()
+        assertNotNull(vm.recoverySession.value, "precondition: recovery dialog should be showing")
+
+        vm.onRecoveryResume()
+        advanceUntilIdle()
+
+        assertNotNull(vm.recoverySession.value, "recoverySession must remain non-null after a failed resume so dialog stays visible")
+        assertEquals(
+            AppViewModel.StartDestination.TripList,
+            vm.startDestination.value,
+            "startDestination must remain TripList after a failed resume",
+        )
+    }
+
+    @Test
+    fun recoverySession_isNull_whenSessionExistsAndServiceRunning() = runTest(testDispatcher) {
+        // Service is alive (START_STICKY recovered or normal active session) — no recovery needed.
+        val vm = buildViewModel(activeSession = aRecordingSession, isServiceRunning = true)
+        advanceUntilIdle()
+        assertNull(
+            vm.recoverySession.value,
+            "recoverySession must be null when service is running alongside the active session",
+        )
     }
 }

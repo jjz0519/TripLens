@@ -42,6 +42,14 @@ android {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
+    testOptions {
+        unitTests {
+            // android.util.Log (and other framework stubs) return default values instead of
+            // throwing RuntimeException in JVM unit tests. Required for ExportUseCase tests
+            // since exportLogI/exportLogE use android.util.Log in the androidMain actual.
+            isReturnDefaultValues = true
+        }
+    }
 }
 
 sqldelight {

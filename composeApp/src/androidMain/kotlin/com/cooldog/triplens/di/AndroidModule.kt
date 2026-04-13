@@ -1,6 +1,8 @@
 package com.cooldog.triplens.di
 
+import android.content.Context
 import android.content.Intent
+import android.util.Log
 import androidx.appcompat.app.AppCompatDelegate
 import com.cooldog.triplens.R
 import androidx.core.content.ContextCompat
@@ -63,6 +65,8 @@ import org.koin.dsl.module
  * Play Services. There is no correctness issue with sharing it as a singleton; the service
  * controls start/stop explicitly.
  */
+private const val TAG = "TripLens/AndroidModule"
+
 val androidModule = module {
 
     // DatabaseDriverFactory requires Context. AndroidSqliteDriver handles WAL/FK setup.
@@ -70,7 +74,24 @@ val androidModule = module {
 
     // AppDatabase is the single source of truth for all repositories. Singleton ensures
     // all 5 repositories see the same SQLite connection and the same in-memory state.
-    single { AppDatabase(get<DatabaseDriverFactory>().createDriver()) }
+    //
+    // Startup integrity check (Task 18): if SQLite reports a corrupted database, close the
+    // driver, rename the file to triplens.db.corrupt, and open a fresh database. This is a
+    // last-resort recovery — data loss is unavoidable, but the app remains usable.
+    single {
+        val factory = get<DatabaseDriverFactory>()
+        var driver  = factory.createDriver()
+        var db      = AppDatabase(driver)
+        if (!db.integrityCheck()) {
+            Log.e(TAG, "DB integrity check FAILED — renaming corrupt database and creating a fresh one")
+            driver.close()
+            factory.renameCorruptDb()
+            driver = factory.createDriver()
+            db     = AppDatabase(driver)
+            Log.i(TAG, "Fresh database created after corrupt recovery")
+        }
+        db
+    }
 
     // Location provider — singleton since FusedLocationProviderClient is a heavy object.
     single { LocationProvider(androidContext()) }
@@ -87,13 +108,49 @@ val androidModule = module {
     // AppPreferences — DataStore wrapper. Must be a singleton: DataStore must not be opened twice.
     single<AppPreferences> { DataStoreAppPreferences(androidContext()) }
 
-    // AppViewModel — resolves the start destination by querying SessionRepository at launch.
+    // AppViewModel — resolves the start destination by querying SessionRepository at launch,
+    // and handles orphaned session recovery (Task 18).
     // viewModel {} registers a Koin ViewModel factory; the same instance is returned for the
     // same ViewModelStore (i.e., the same Activity), so App() and AppNavGraph() share one VM.
     viewModel {
+        val ctx = androidContext()
         AppViewModel(
-            getActiveSessionFn = { get<SessionRepository>().getActiveSession() },
+            getActiveSessionFn     = { get<SessionRepository>().getActiveSession() },
             isOnboardingCompleteFn = { get<AppPreferences>().isOnboardingComplete() },
+
+            // Service is considered running if the in-process instance reference is set
+            // OR if SharedPreferences still contains the session ID (START_STICKY may be
+            // in the middle of restarting the service — the prefs key is written before
+            // onDestroy clears it, so its presence means the service was alive recently).
+            isServiceRunningFn = {
+                LocationTrackingService.runningInstance != null ||
+                ctx.getSharedPreferences(LocationTrackingService.PREFS_NAME, Context.MODE_PRIVATE)
+                    .contains(LocationTrackingService.PREFS_SESSION_ID)
+            },
+
+            // Resume: mark the orphaned session interrupted, create a new session in the
+            // same group, and start LocationTrackingService with the new session's ID.
+            resumeOrphanedSessionFn = { orphanedSessionId, groupId ->
+                get<SessionRepository>().markInterrupted(orphanedSessionId)
+                val newId   = java.util.UUID.randomUUID().toString()
+                val now     = System.currentTimeMillis()
+                val name    = ctx.getString(R.string.session_default_name)
+                get<SessionRepository>().createSession(newId, groupId, name, now)
+                val profile = get<AppPreferences>().getAccuracyProfile()
+                ContextCompat.startForegroundService(ctx,
+                    Intent(ctx, LocationTrackingService::class.java).apply {
+                        action = LocationTrackingService.ACTION_START
+                        putExtra(LocationTrackingService.EXTRA_SESSION_ID, newId)
+                        putExtra(LocationTrackingService.EXTRA_ACCURACY_PROFILE, profile.name)
+                        putExtra(LocationTrackingService.EXTRA_SESSION_START_TIME, now)
+                    }
+                )
+            },
+
+            // Discard: mark the orphaned session interrupted; no new session is created.
+            discardOrphanedSessionFn = { orphanedSessionId ->
+                get<SessionRepository>().markInterrupted(orphanedSessionId)
+            },
         )
     }
 

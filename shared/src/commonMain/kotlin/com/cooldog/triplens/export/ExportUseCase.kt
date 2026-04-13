@@ -33,9 +33,10 @@ import com.cooldog.triplens.repository.TripRepository
  * 8. Delete the temp directory.
  *
  * ## Error handling
- * If any step throws, the temp directory is deleted before the exception propagates so
- * no orphaned files accumulate in cache storage. The zip file is also deleted on failure
- * to prevent a partial archive from being shared.
+ * All steps (including temp-dir creation) are inside a single try/catch. On any failure
+ * the temp directory is deleted before the exception propagates, preventing orphaned files
+ * from accumulating in cache storage. The zip file is also deleted on failure to prevent
+ * a partial archive from being shared.
  *
  * @param tripRepo       Loads the [TripGroup].
  * @param sessionRepo    Loads sessions for the group.
@@ -55,7 +56,7 @@ class ExportUseCase(
 ) {
 
     companion object {
-        private const val LOG_TAG = "[TripLens/Export]"
+        private const val TAG = "TripLens/Export"
     }
 
     /**
@@ -68,10 +69,10 @@ class ExportUseCase(
      * @throws ExportException          if any pipeline step fails (temp dir is cleaned up first).
      */
     suspend fun export(groupId: String, nowMs: Long): ExportResult {
-        println("$LOG_TAG Starting export for groupId=$groupId")
+        exportLogI(TAG, "Starting export for groupId=$groupId")
 
         // --- Step 1: Load data ---
-        println("$LOG_TAG Step 1: Loading data")
+        exportLogI(TAG, "Step 1: Loading data")
         val group = tripRepo.getGroupById(groupId)
             ?: throw IllegalArgumentException("No TripGroup found for id=$groupId")
         val sessions    = sessionRepo.getSessionsByGroup(groupId)
@@ -82,7 +83,7 @@ class ExportUseCase(
             s.id to noteRepo.getBySession(s.id)
         }
         val voiceNotes = notesBySession.values.flatten().filter { it.audioFilename != null }
-        println("$LOG_TAG Step 1 done: ${sessions.size} sessions, " +
+        exportLogI(TAG, "Step 1 done: ${sessions.size} sessions, " +
                 "${pointsBySession.values.sumOf { it.size }} points, " +
                 "${voiceNotes.size} voice notes")
 
@@ -95,15 +96,22 @@ class ExportUseCase(
         val folderName = "triplens-$sanitizedName-$dateStr"
         val archiveFilename = "$folderName.triplens"
 
-        // --- Step 2: Create temp directory ---
-        println("$LOG_TAG Step 2: Creating temp directory '$folderName'")
-        val tempDir = fileSystem.createTempDir(folderName)
-        println("$LOG_TAG Step 2 done: tempDir=$tempDir")
-
+        // tempDir and outputPath are declared before the try so the catch block can reference
+        // them for cleanup. Both start as empty strings — the same "was it created?" sentinel
+        // that outputPath already used before this refactor.
+        var tempDir    = ""
         var outputPath = ""
+        var sizeBytes  = 0L
         try {
+            // --- Step 2: Create temp directory ---
+            // Moved inside try (was previously outside) so any IO failure here is caught,
+            // wrapped as ExportException, and propagated cleanly to the caller.
+            exportLogI(TAG, "Step 2: Creating temp directory '$folderName'")
+            tempDir = fileSystem.createTempDir(folderName)
+            exportLogI(TAG, "Step 2 done: tempDir=$tempDir")
+
             // --- Step 3: Write index.json ---
-            println("$LOG_TAG Step 3: Writing index.json")
+            exportLogI(TAG, "Step 3: Writing index.json")
             val indexJson = IndexJsonBuilder.build(
                 group            = group,
                 sessions         = sessions,
@@ -112,10 +120,10 @@ class ExportUseCase(
                 exportedAtMs     = nowMs
             )
             fileSystem.writeText(fileSystem.joinPath(tempDir, "index.json"), indexJson)
-            println("$LOG_TAG Step 3 done: index.json written (${indexJson.length} chars)")
+            exportLogI(TAG, "Step 3 done: index.json written (${indexJson.length} chars)")
 
             // --- Step 4: Write GPX files ---
-            println("$LOG_TAG Step 4: Writing GPX files")
+            exportLogI(TAG, "Step 4: Writing GPX files")
             val tracksDir = fileSystem.joinPath(tempDir, "tracks")
             fileSystem.createDir(tracksDir)
             sessions.forEach { session ->
@@ -123,12 +131,12 @@ class ExportUseCase(
                 val gpxContent = GpxWriter.write(session, points)
                 val gpxPath = fileSystem.joinPath(tracksDir, "session_${session.id}.gpx")
                 fileSystem.writeText(gpxPath, gpxContent)
-                println("$LOG_TAG Step 4: Wrote ${points.size} points for session ${session.id}")
+                exportLogI(TAG, "Step 4: Wrote ${points.size} points for session ${session.id}")
             }
-            println("$LOG_TAG Step 4 done: ${sessions.size} GPX files written")
+            exportLogI(TAG, "Step 4 done: ${sessions.size} GPX files written")
 
             // --- Step 5: Copy voice notes ---
-            println("$LOG_TAG Step 5: Copying voice notes")
+            exportLogI(TAG, "Step 5: Copying voice notes")
             val notesDir = fileSystem.joinPath(tempDir, "notes")
             if (voiceNotes.isNotEmpty()) {
                 fileSystem.createDir(notesDir)
@@ -137,44 +145,44 @@ class ExportUseCase(
                     val sourcePath = fileSystem.appPrivatePath("notes", filename)
                     val destPath   = fileSystem.joinPath(notesDir, filename)
                     fileSystem.copy(sourcePath, destPath)
-                    println("$LOG_TAG Step 5: Copied $filename")
+                    exportLogI(TAG, "Step 5: Copied $filename")
                 }
             }
-            println("$LOG_TAG Step 5 done: ${voiceNotes.size} voice notes copied")
+            exportLogI(TAG, "Step 5 done: ${voiceNotes.size} voice notes copied")
 
             // --- Step 6: Write README.txt ---
             // Strings.exportReadmeContent is always English — the desktop import tool must
             // be able to parse it regardless of the user's locale (see Strings.kt).
-            println("$LOG_TAG Step 6: Writing README.txt")
+            exportLogI(TAG, "Step 6: Writing README.txt")
             fileSystem.writeText(fileSystem.joinPath(tempDir, "README.txt"), Strings.exportReadmeContent)
-            println("$LOG_TAG Step 6 done")
+            exportLogI(TAG, "Step 6 done")
 
             // --- Step 7: Zip ---
-            println("$LOG_TAG Step 7: Zipping to '$archiveFilename'")
+            exportLogI(TAG, "Step 7: Zipping to '$archiveFilename'")
             outputPath = fileSystem.createOutputPath("exports", archiveFilename)
             fileSystem.zip(tempDir, outputPath)
-            val sizeBytes = fileSystem.size(outputPath)
-            println("$LOG_TAG Step 7 done: archive=$outputPath, size=$sizeBytes bytes")
+            // Capture size once here so it can be reused in ExportResult without a second IO call.
+            sizeBytes = fileSystem.size(outputPath)
+            exportLogI(TAG, "Step 7 done: archive=$outputPath, size=$sizeBytes bytes")
 
         } catch (e: Exception) {
             // Clean up temp dir so cache doesn't accumulate partial exports.
-            println("$LOG_TAG Export failed at a pipeline step — cleaning up temp dir: ${e.message}")
-            fileSystem.deleteRecursive(tempDir)
+            // tempDir is empty-string if createTempDir hadn't succeeded yet.
+            exportLogE(TAG, "Export failed — cleaning up. tempDir='$tempDir' outputPath='$outputPath'", e)
+            if (tempDir.isNotEmpty()) fileSystem.deleteRecursive(tempDir)
             // If the zip was partially written, delete it too to prevent a corrupt archive from
             // being shared. outputPath is empty-string if zip hadn't started yet.
-            if (outputPath.isNotEmpty()) {
-                fileSystem.deleteRecursive(outputPath)
-            }
+            if (outputPath.isNotEmpty()) fileSystem.deleteRecursive(outputPath)
             throw ExportException("Export failed: ${e.message}", e)
         }
 
         // --- Step 8: Delete temp dir ---
-        println("$LOG_TAG Step 8: Deleting temp dir")
+        exportLogI(TAG, "Step 8: Deleting temp dir")
         fileSystem.deleteRecursive(tempDir)
-        println("$LOG_TAG Step 8 done")
+        exportLogI(TAG, "Step 8 done")
 
-        val result = ExportResult(path = outputPath, sizeBytes = fileSystem.size(outputPath))
-        println("$LOG_TAG Export complete: $result")
+        val result = ExportResult(path = outputPath, sizeBytes = sizeBytes)
+        exportLogI(TAG, "Export complete: $result")
         return result
     }
 }

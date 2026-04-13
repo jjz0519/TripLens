@@ -479,5 +479,5 @@ Each task entry:
 | 15 | Session Review Screen | UI | Full-trip map + timeline | ✓ |
 | 16 | Settings Screen | UI | DataStore-backed preferences | ✓ |
 | 17 | Localization | Cross-cutting | EN + ZH strings | ✓ |
-| 18 | Error Handling + Recovery | Cross-cutting | Recovery dialog + DB check |
+| 18 | Error Handling + Recovery | Cross-cutting | Recovery dialog + DB check | ✓ |
 | 19 | Export Integration + Share | Export | Share sheet + progress UI |
