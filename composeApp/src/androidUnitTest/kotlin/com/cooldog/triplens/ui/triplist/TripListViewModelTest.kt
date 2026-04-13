@@ -3,6 +3,8 @@ package com.cooldog.triplens.ui.triplist
 import com.cooldog.triplens.export.ExportResult
 import com.cooldog.triplens.model.TripGroup
 import com.cooldog.triplens.repository.TripGroupWithStats
+import com.cooldog.triplens.ui.common.ExportState
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
@@ -47,6 +49,9 @@ class TripListViewModelTest {
     private var lastRenamedName: String? = null
     private var exportCallCount = 0
     private var exportShouldThrow = false
+    /** When non-null, export suspends until this deferred is resolved. */
+    private var exportGate: CompletableDeferred<Unit>? = null
+    private val exportedPath = "/data/user/0/com.cooldog.triplens/files/exports/trip.triplens"
 
     // ── Builder ──────────────────────────────────────────────────────────────────
 
@@ -71,8 +76,9 @@ class TripListViewModelTest {
             },
             exportFn = { _, _ ->
                 exportCallCount++
-                if (exportShouldThrow) throw RuntimeException("Export failed")
-                ExportResult(path = "/data/export/test.triplens", sizeBytes = 1024)
+                exportGate?.await()
+                if (exportShouldThrow) throw RuntimeException("disk full")
+                ExportResult(path = exportedPath, sizeBytes = 2048)
             },
             clock = { FIXED_EPOCH },
             ioDispatcher = testDispatcher,
@@ -161,7 +167,7 @@ class TripListViewModelTest {
     }
 
     @Test
-    fun onExportGroup_success_showsSnackbar() = runTest(testDispatcher) {
+    fun onExportGroup_success_emitsShareFileEvent() = runTest(testDispatcher) {
         fakeGroups = listOf(makeGroupWithStats("g1", "My Trip"))
         val vm = buildViewModel()
         advanceUntilIdle()
@@ -173,14 +179,61 @@ class TripListViewModelTest {
         advanceUntilIdle()
 
         assertEquals(1, exportCallCount)
-        assertTrue(events.any {
-            it is TripListViewModel.Event.ShowSnackbar && it.message.contains("Exported")
-        }, "Success snackbar must contain 'Exported'")
+        assertTrue(
+            events.any { it is TripListViewModel.Event.ShareFile && it.path == exportedPath },
+            "Successful export must emit ShareFile with the archive path",
+        )
         job.cancel()
     }
 
     @Test
-    fun onExportGroup_failure_showsErrorSnackbar() = runTest(testDispatcher) {
+    fun onExportGroup_success_exportStateResetsToIdle() = runTest(testDispatcher) {
+        fakeGroups = listOf(makeGroupWithStats("g1", "My Trip"))
+        val vm = buildViewModel()
+        advanceUntilIdle()
+
+        vm.onExportGroup("g1")
+        advanceUntilIdle()
+
+        assertIs<ExportState.Idle>(vm.exportState.value)
+    }
+
+    @Test
+    fun onExportGroup_whileRunning_exportStateIsInProgress() = runTest(testDispatcher) {
+        fakeGroups = listOf(makeGroupWithStats("g1", "My Trip"))
+        exportGate = CompletableDeferred()
+        val vm = buildViewModel()
+        advanceUntilIdle()
+
+        launch { vm.onExportGroup("g1") }
+        testDispatcher.scheduler.runCurrent()
+
+        assertIs<ExportState.InProgress>(
+            vm.exportState.value,
+            "exportState must be InProgress while export is running",
+        )
+
+        exportGate!!.complete(Unit)
+        advanceUntilIdle()
+    }
+
+    @Test
+    fun onExportGroup_failure_exportStateResetsToIdle() = runTest(testDispatcher) {
+        // The ViewModel transitions through Error and immediately resets to Idle so the
+        // error state does not linger after the snackbar event has been sent.
+        fakeGroups = listOf(makeGroupWithStats("g1", "My Trip"))
+        exportShouldThrow = true
+        val vm = buildViewModel()
+        advanceUntilIdle()
+
+        vm.onExportGroup("g1")
+        advanceUntilIdle()
+
+        assertIs<ExportState.Idle>(vm.exportState.value)
+    }
+
+    @Test
+    fun onExportGroup_failure_emitsSnackbarEvent() = runTest(testDispatcher) {
         fakeGroups = listOf(makeGroupWithStats("g1", "My Trip"))
         exportShouldThrow = true
         val vm = buildViewModel()
@@ -192,9 +245,39 @@ class TripListViewModelTest {
         vm.onExportGroup("g1")
         advanceUntilIdle()
 
-        assertTrue(events.any {
-            it is TripListViewModel.Event.ShowSnackbar && it.message.contains("Export failed")
-        }, "Failure snackbar must contain 'Export failed'")
+        assertTrue(
+            events.any {
+                it is TripListViewModel.Event.ShowSnackbar && it.message.contains("Export failed")
+            },
+            "Failed export must emit a ShowSnackbar event containing 'Export failed'",
+        )
         job.cancel()
+    }
+
+    @Test
+    fun onExportGroup_doubleCall_secondCallIsNoOp() = runTest(testDispatcher) {
+        fakeGroups = listOf(makeGroupWithStats("g1", "My Trip"))
+        exportGate = CompletableDeferred()
+        val vm = buildViewModel()
+        advanceUntilIdle()
+
+        val events = mutableListOf<TripListViewModel.Event>()
+        val collectJob = launch { vm.events.collect { events.add(it) } }
+
+        launch { vm.onExportGroup("g1") }
+        testDispatcher.scheduler.runCurrent()
+
+        // Second call while InProgress — must be a no-op.
+        vm.onExportGroup("g1")
+
+        exportGate!!.complete(Unit)
+        advanceUntilIdle()
+
+        assertEquals(1, exportCallCount, "Only one export must run despite the double call")
+        assertEquals(
+            1, events.filterIsInstance<TripListViewModel.Event.ShareFile>().size,
+            "Double-tap must not trigger two ShareFile events",
+        )
+        collectJob.cancel()
     }
 }

@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.cooldog.triplens.domain.SegmentSmoother
 import com.cooldog.triplens.model.TransportMode
+import com.cooldog.triplens.ui.common.ExportState
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -52,12 +53,25 @@ class TripDetailViewModel(private val deps: TripDetailDeps) : ViewModel() {
 
     sealed interface Event {
         data class ShowSnackbar(val message: String) : Event
+
+        /**
+         * Emitted on successful export. [path] is the absolute filesystem path to the
+         * exported .triplens archive. The Screen converts it to a content:// URI via
+         * FileProvider and fires an ACTION_SEND chooser intent.
+         *
+         * The path is passed as a plain String to keep android.net.Uri out of the ViewModel,
+         * consistent with the principle that Intent construction is a View-layer concern.
+         */
+        data class ShareFile(val path: String) : Event
     }
 
     // ── State and event plumbing ─────────────────────────────────────────────────
 
     private val _uiState = MutableStateFlow<UiState>(UiState.Loading)
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
+
+    private val _exportState = MutableStateFlow<ExportState>(ExportState.Idle)
+    val exportState: StateFlow<ExportState> = _exportState.asStateFlow()
 
     private val _events = Channel<Event>(Channel.BUFFERED)
     val events: Flow<Event> = _events.receiveAsFlow()
@@ -85,20 +99,39 @@ class TripDetailViewModel(private val deps: TripDetailDeps) : ViewModel() {
     }
 
     /**
-     * Exports the entire group. Shows a snackbar with the file path on success
-     * (dev button — full share sheet in Task 19).
+     * Exports the entire group and triggers the Android share chooser on success.
+     *
+     * ## State transitions
+     * - Sets [exportState] to [ExportState.InProgress] immediately (disables the export button).
+     * - On success: emits [Event.ShareFile] with the archive path, resets to [ExportState.Idle].
+     * - On failure: emits [Event.ShowSnackbar] with the error, sets [ExportState.Error].
+     *
+     * Guard against double-taps: if an export is already [ExportState.InProgress] the call is
+     * a no-op — the button is disabled in the UI, but this check prevents races if the VM is
+     * called programmatically.
      */
     fun onExportGroup() {
+        // compareAndSet prevents a double-tap race: two rapid calls on the same main-thread
+        // frame would both pass a plain `if (_exportState.value is InProgress) return` check
+        // before either sets the state. compareAndSet is atomic — only one wins.
+        val current = _exportState.value
+        if (current is ExportState.InProgress) return
+        if (!_exportState.compareAndSet(current, ExportState.InProgress)) return
         viewModelScope.launch {
             try {
                 val result = withContext(deps.ioDispatcher) {
                     deps.exportFn(deps.groupId, deps.clock())
                 }
-                Log.i(TAG, "Exported group=${deps.groupId} path=${result.path}")
-                _events.send(Event.ShowSnackbar("Exported: ${result.path}"))
+                Log.i(TAG, "Exported group=${deps.groupId} path=${result.path} size=${result.sizeBytes}")
+                _events.send(Event.ShareFile(result.path))
+                _exportState.value = ExportState.Idle
             } catch (e: Exception) {
                 Log.e(TAG, "Export failed for group=${deps.groupId}", e)
+                _exportState.value = ExportState.Error(e.message ?: "Unknown error")
                 _events.send(Event.ShowSnackbar("Export failed: ${e.message}"))
+                // Reset to Idle so the button re-enables and the error state doesn't linger
+                // past the snackbar dismissal (which the screen handles via ShowSnackbar event).
+                _exportState.value = ExportState.Idle
             }
         }
     }

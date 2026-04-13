@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -43,12 +44,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.cooldog.triplens.R
+import com.cooldog.triplens.ui.common.ExportState
 import com.cooldog.triplens.ui.common.RenameDialog
+import com.cooldog.triplens.ui.common.startShareFileIntent
 import com.cooldog.triplens.ui.common.formatDistance
 import com.cooldog.triplens.ui.common.formatDuration
 import com.cooldog.triplens.ui.common.modeEmoji
@@ -69,17 +73,22 @@ fun TripDetailScreen(
     onBack: () -> Unit,
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val exportState by viewModel.exportState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
+    val context = LocalContext.current
 
     // Dialog state — which session is being renamed.
     var renameTarget by remember { mutableStateOf<SessionItem?>(null) }
 
-    // Collect one-shot events for snackbar display.
+    // Collect one-shot events: snackbar messages and share-sheet triggers.
     LaunchedEffect(Unit) {
         viewModel.events.collect { event ->
             when (event) {
                 is TripDetailViewModel.Event.ShowSnackbar -> {
                     snackbarHostState.showSnackbar(event.message)
+                }
+                is TripDetailViewModel.Event.ShareFile -> {
+                    context.startShareFileIntent(event.path)
                 }
             }
         }
@@ -120,12 +129,25 @@ fun TripDetailScreen(
                     }
                 },
                 actions = {
-                    // Export button in the top bar (dev button — shows file path snackbar).
-                    IconButton(onClick = { viewModel.onExportGroup() }) {
-                        Icon(
-                            Icons.Default.FileDownload,
-                            contentDescription = stringResource(R.string.action_export),
-                        )
+                    // Export button: shows a small spinner while export is in progress,
+                    // then fires the system share chooser on success.
+                    IconButton(
+                        onClick = { viewModel.onExportGroup() },
+                        enabled = exportState !is ExportState.InProgress,
+                    ) {
+                        if (exportState is ExportState.InProgress) {
+                            // Replace the icon with an indeterminate spinner sized to match
+                            // the icon's visual weight (24.dp is the Material icon default).
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(24.dp),
+                                strokeWidth = 2.5.dp,
+                            )
+                        } else {
+                            Icon(
+                                Icons.Default.FileDownload,
+                                contentDescription = stringResource(R.string.action_export),
+                            )
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(

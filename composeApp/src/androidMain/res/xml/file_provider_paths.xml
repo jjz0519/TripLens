@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    FileProvider path configuration for TripLens.
+
+    Exposes context.filesDir/exports/ so that .triplens zip archives written by
+    AndroidFileSystem.createOutputPath("exports", ...) can be shared with other apps
+    via a content:// URI without requiring READ_EXTERNAL_STORAGE.
+
+    The 'path' value must match the subdir used by AndroidFileSystem.createOutputPath:
+        context.filesDir / "exports" / <filename>
+    and the 'name' is the path segment that appears in the content:// URI.
+-->
+<paths>
+    <files-path name="exports" path="exports/" />
+</paths>

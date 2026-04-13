@@ -41,6 +41,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -48,8 +49,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.cooldog.triplens.R
 import com.cooldog.triplens.ui.common.DeleteConfirmDialog
+import com.cooldog.triplens.ui.common.ExportState
 import com.cooldog.triplens.ui.common.RenameDialog
 import com.cooldog.triplens.ui.common.formatDistance
+import com.cooldog.triplens.ui.common.startShareFileIntent
 
 /**
  * Trip List screen — displays all TripGroup cards in a scrollable list.
@@ -66,18 +69,23 @@ fun TripListScreen(
     onGroupClick: (groupId: String) -> Unit,
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val exportState by viewModel.exportState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
+    val context = LocalContext.current
 
     // Dialog state — which group is being renamed or deleted.
     var renameTarget by remember { mutableStateOf<TripGroupItem?>(null) }
     var deleteTarget by remember { mutableStateOf<TripGroupItem?>(null) }
 
-    // Collect one-shot events for snackbar display.
+    // Collect one-shot events: snackbar messages and share-sheet triggers.
     LaunchedEffect(Unit) {
         viewModel.events.collect { event ->
             when (event) {
                 is TripListViewModel.Event.ShowSnackbar -> {
                     snackbarHostState.showSnackbar(event.message)
+                }
+                is TripListViewModel.Event.ShareFile -> {
+                    context.startShareFileIntent(event.path)
                 }
             }
         }
@@ -162,6 +170,7 @@ fun TripListScreen(
                                 onRename = { renameTarget = item },
                                 onExport = { viewModel.onExportGroup(item.id) },
                                 onDelete = { deleteTarget = item },
+                                exportInProgress = exportState is ExportState.InProgress,
                             )
                         }
                     }
@@ -197,6 +206,7 @@ private fun TripGroupCard(
     onRename: () -> Unit,
     onExport: () -> Unit,
     onDelete: () -> Unit,
+    exportInProgress: Boolean,
 ) {
     var showMenu by remember { mutableStateOf(false) }
 
@@ -313,8 +323,19 @@ private fun TripGroupCard(
                             showMenu = false
                             onExport()
                         },
+                        enabled = !exportInProgress,
                         leadingIcon = {
-                            Icon(Icons.Default.FileDownload, contentDescription = null)
+                            // Show a small spinner while any export is in progress so the user
+                            // knows the action is running. The item is also disabled to prevent
+                            // concurrent exports.
+                            if (exportInProgress) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(24.dp),
+                                    strokeWidth = 2.5.dp,
+                                )
+                            } else {
+                                Icon(Icons.Default.FileDownload, contentDescription = null)
+                            }
                         },
                     )
                     DropdownMenuItem(

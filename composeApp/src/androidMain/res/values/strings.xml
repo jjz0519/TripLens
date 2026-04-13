@@ -140,6 +140,10 @@
     <string name="recovery_action_resume">Resume</string>
     <string name="recovery_action_discard">Discard</string>
 
+    <!-- ── Export share sheet ──────────────────────────────────────────────── -->
+    <!-- Title shown in the Android share chooser when sharing a .triplens archive -->
+    <string name="export_chooser_title">Share trip export</string>
+
     <!-- ── Shared module (Strings.kt expect/actual) ──────────────────────── -->
     <!-- Date format used as the default name for new TripGroups -->
     <string name="default_trip_name_format" translatable="false">yyyy-MM-dd</string>

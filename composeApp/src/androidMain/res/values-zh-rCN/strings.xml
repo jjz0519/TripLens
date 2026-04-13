@@ -125,6 +125,9 @@
     <string name="recovery_action_resume">继续录制</string>
     <string name="recovery_action_discard">丢弃</string>
 
+    <!-- ── Export share sheet ──────────────────────────────────────────────── -->
+    <string name="export_chooser_title">分享行程导出</string>
+
     <!-- ── Shared module (Strings.kt) ────────────────────────────────────── -->
     <string name="session_default_name">记录</string>
 </resources>

@@ -35,6 +35,22 @@
             android:name=".service.LocationTrackingService"
             android:foregroundServiceType="location"
             android:exported="false" />
+
+        <!--
+            FileProvider for sharing exported .triplens archives.
+            android:exported="false" is required — access is granted per-share via
+            FLAG_GRANT_READ_URI_PERMISSION rather than being openly accessible.
+            The authority must match FILE_PROVIDER_AUTHORITY in TripDetailScreen.kt / TripListScreen.kt.
+        -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="com.cooldog.triplens.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_provider_paths" />
+        </provider>
     </application>
 
 </manifest>
