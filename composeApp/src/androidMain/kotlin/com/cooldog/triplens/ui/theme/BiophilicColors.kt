@@ -37,6 +37,9 @@ val LocalBiophilicColors = staticCompositionLocalOf<BiophilicColors> {
 }
 
 fun biophilicColors(palette: Palette = Palette.MOSS, dark: Boolean = false): BiophilicColors {
+    // Dark mode uses a single unified palette regardless of the palette arg — contrast/accessibility
+    // requirements dominate color choices in dark mode and all nature themes converge on similar
+    // dark-green backgrounds at low luminance, so per-palette dark variants add no perceptible value.
     return if (dark) darkBiophilicColors() else lightBiophilicColors(palette)
 }
 
