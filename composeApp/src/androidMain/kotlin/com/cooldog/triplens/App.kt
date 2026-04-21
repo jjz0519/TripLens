@@ -31,16 +31,23 @@ import org.koin.androidx.compose.koinViewModel
  *
  * [appViewModel] is passed to [AppNavGraph] so screens (e.g. RecordingScreen) can call
  * [AppViewModel.onSessionActiveChanged] without injecting a second ViewModel instance.
+ *
+ * ## Palette (Task 20)
+ * [AppViewModel] loads the persisted palette from DataStore in its init block and exposes it
+ * as [AppViewModel.palette]. koinViewModel() is called outside [TripLensTheme] so the palette
+ * is available before the theme is constructed — this prevents a brief flash on the first frame
+ * if the user has selected a non-default palette.
  */
 @Composable
 fun App() {
-    TripLensTheme {
-        val appViewModel: AppViewModel = koinViewModel()
-        val startDest       by appViewModel.startDestination.collectAsState()
-        val isSessionActive by appViewModel.isSessionActive.collectAsState()
-        val recoverySession by appViewModel.recoverySession.collectAsState()
-        val navController = rememberNavController()
+    val appViewModel: AppViewModel = koinViewModel()
+    val palette         by appViewModel.palette.collectAsState()
+    val startDest       by appViewModel.startDestination.collectAsState()
+    val isSessionActive by appViewModel.isSessionActive.collectAsState()
+    val recoverySession by appViewModel.recoverySession.collectAsState()
+    val navController = rememberNavController()
 
+    TripLensTheme(palette = palette) {
         // Box allows the recovery dialog to overlay the resolved screen without disrupting the
         // nav graph (which must be stable so the back stack is not recreated).
         Box(modifier = Modifier.fillMaxSize()) {

@@ -4,6 +4,7 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.cooldog.triplens.model.Session
+import com.cooldog.triplens.ui.theme.Palette
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -50,6 +51,7 @@ class AppViewModel(
      * Marks the orphaned session as interrupted without starting a new one. Called on Discard.
      */
     private val discardOrphanedSessionFn:  (orphanedSessionId: String) -> Unit = {},
+    private val getPaletteFn:              suspend () -> Palette = { Palette.MOSS },
     private val ioDispatcher:              CoroutineDispatcher = Dispatchers.IO,
 ) : ViewModel() {
 
@@ -77,6 +79,9 @@ class AppViewModel(
      */
     private val _isSessionActive = MutableStateFlow(false)
     val isSessionActive: StateFlow<Boolean> = _isSessionActive.asStateFlow()
+
+    private val _palette = MutableStateFlow(Palette.MOSS)
+    val palette: StateFlow<Palette> = _palette.asStateFlow()
 
     /** Called by RecordingScreen when a session starts or stops to update the bottom-nav pulse. */
     fun onSessionActiveChanged(isActive: Boolean) {
@@ -173,6 +178,12 @@ class AppViewModel(
                             _recoverySession.value = active
                             _startDestination.value = StartDestination.TripList
                         }
+                    }
+                    try {
+                        _palette.value = getPaletteFn()
+                        Log.d(TAG, "init: palette loaded → ${_palette.value}")
+                    } catch (e: Exception) {
+                        Log.w(TAG, "init: failed to load palette, defaulting to MOSS", e)
                     }
                 } catch (e: Exception) {
                     // DB or DataStore errors are non-fatal; default to TripList.

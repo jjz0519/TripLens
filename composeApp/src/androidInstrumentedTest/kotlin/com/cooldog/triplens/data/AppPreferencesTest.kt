@@ -5,6 +5,7 @@ import androidx.test.core.app.ApplicationProvider
 import com.cooldog.triplens.data.Language
 import com.cooldog.triplens.data.ScanInterval
 import com.cooldog.triplens.platform.AccuracyProfile
+import com.cooldog.triplens.ui.theme.Palette
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
@@ -86,5 +87,18 @@ class AppPreferencesTest {
     fun setScanInterval_Short_readBackMatches() = runTest {
         prefs.setScanInterval(ScanInterval.SHORT)
         assertEquals(ScanInterval.SHORT, prefs.getScanInterval(), "getScanInterval must return SHORT after setScanInterval(SHORT)")
+    }
+
+    // ── Palette (Task 20) ─────────────────────────────────────────────────────────
+
+    @Test
+    fun getPalette_defaultIsMoss() = runTest {
+        assertEquals(Palette.MOSS, prefs.getPalette(), "Default palette must be MOSS")
+    }
+
+    @Test
+    fun setPalette_Coastal_readBackMatches() = runTest {
+        prefs.setPalette(Palette.COASTAL)
+        assertEquals(Palette.COASTAL, prefs.getPalette(), "getPalette must return COASTAL after setPalette(COASTAL)")
     }
 }

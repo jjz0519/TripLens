@@ -151,6 +151,7 @@ val androidModule = module {
             discardOrphanedSessionFn = { orphanedSessionId ->
                 get<SessionRepository>().markInterrupted(orphanedSessionId)
             },
+            getPaletteFn = { get<AppPreferences>().getPalette() },
         )
     }
 

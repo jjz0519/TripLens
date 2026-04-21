@@ -33,6 +33,7 @@ kotlin {
             implementation(libs.androidx.appcompat)
             implementation(libs.datastore.preferences)
             implementation(libs.maplibre.android)
+            implementation(libs.compose.ui.text.google.fonts)
             implementation(libs.kotlinx.coroutines.android)
         }
         commonMain.dependencies {
