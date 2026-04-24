@@ -249,23 +249,29 @@ fun RecordingScreen(
 
     // ── Main layout ───────────────────────────────────────────────────────────────
     //
-    // The outer Column always has exactly two weight-bearing children:
-    //   [0] Box (weight 0.6f) — map + optional top-bar overlay
-    //   [1] bottom panel     — RecordingIdleContent OR RecordingActiveContent
+    // Idle state:   Box fills the full Column (weight 1f); RecordingIdleContent is an overlay
+    //               inside that same Box — map is visible full-height through the overlay.
+    // Active state: Box takes (1f - panelWeight); RecordingActiveContent is a sibling below.
     //
-    // This keeps AndroidView at Box[0] in both idle and active states, preventing
-    // the view from being torn down on the Idle → ActiveRecording transition.
+    // AndroidView is always at slot 0 inside the Box in both states, so the GL context is
+    // never destroyed on the Idle → ActiveRecording transition.
 
     val activeState = uiState as? RecordingViewModel.UiState.ActiveRecording
 
+    // Reset media expansion when returning to idle so the next session starts at 40/60.
+    if (activeState == null) {
+        isMediaExpanded = false
+    }
+
     Column(modifier = Modifier.fillMaxSize()) {
 
-        // ── Map area: takes the complement of the panel weight ────────────────────
-        // 1f - panelWeight gives 0.6f at rest and 0.3f when the media list is expanded.
+        // ── Map area ──────────────────────────────────────────────────────────────
+        // Active: weight = 1f - panelWeight (0.6f at rest, 0.3f when media expanded).
+        // Idle:   weight = 1f (full screen) — RecordingIdleContent overlays on top.
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .weight(1f - panelWeight),
+                .weight(if (activeState != null) 1f - panelWeight else 1f),
         ) {
             AndroidView(
                 factory = {
@@ -284,9 +290,9 @@ fun RecordingScreen(
                 modifier = Modifier.fillMaxSize(),
             )
 
-            // Top bar overlaid on the map — only visible during active recording.
-            // Overlay avoids changing the AndroidView's position in the composition tree.
             if (activeState != null) {
+                // Top bar overlaid on the map — only visible during active recording.
+                // Overlay avoids changing the AndroidView's position in the composition tree.
                 RecordingActiveTopBar(
                     groupName = activeState.groupName,
                     elapsedSeconds = activeState.elapsedSeconds,
@@ -295,12 +301,27 @@ fun RecordingScreen(
                         .align(Alignment.TopStart)
                         .fillMaxWidth(),
                 )
+            } else {
+                // Idle overlay: RecordingIdleContent fills the Box on top of the map.
+                // Map stays full-screen; the idle UI elements (header, cards, start panel)
+                // are positioned via Alignment inside RecordingIdleContent's own Box.
+                RecordingIdleContent(
+                    uiState = uiState,
+                    onStartTapped = {
+                        val locationGranted = PermissionChecker.checkSelfPermission(
+                            context,
+                            Manifest.permission.ACCESS_FINE_LOCATION,
+                        ) == PermissionChecker.PERMISSION_GRANTED
+                        viewModel.onStartTapped(locationGranted)
+                    },
+                    modifier = Modifier.fillMaxSize(),
+                )
             }
         }
 
-        // ── Bottom panel ───────────────────────────────────────────────────────────
-        // Active: animated weight (0.4f ↔ 0.7f) driven by media list scroll position.
-        // Idle: fixed 0.4f — no media list, no expansion needed.
+        // ── Active bottom panel ────────────────────────────────────────────────────
+        // Only present during active recording. Animated weight (0.4f ↔ 0.7f) driven
+        // by the media list scroll position reported by RecordingActiveContent.
         if (activeState != null) {
             RecordingActiveContent(
                 state = activeState,
@@ -314,22 +335,6 @@ fun RecordingScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(panelWeight),
-            )
-        } else {
-            // Reset expansion so the next recording session starts at the default ratio.
-            isMediaExpanded = false
-            RecordingIdleContent(
-                uiState = uiState,
-                onStartTapped = {
-                    val locationGranted = PermissionChecker.checkSelfPermission(
-                        context,
-                        Manifest.permission.ACCESS_FINE_LOCATION,
-                    ) == PermissionChecker.PERMISSION_GRANTED
-                    viewModel.onStartTapped(locationGranted)
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(0.4f),
             )
         }
     }
