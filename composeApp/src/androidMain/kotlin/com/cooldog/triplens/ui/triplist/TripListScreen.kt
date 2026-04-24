@@ -49,6 +49,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -354,9 +355,9 @@ private fun BiophilicHeader(bio: BiophilicColors) {
  */
 @Composable
 private fun StatPillsRow(bio: BiophilicColors, groups: List<TripGroupItem>) {
-    val tripCount    = groups.size.toString()
-    val distanceKm   = "${"%.1f".format(groups.sumOf { it.totalDistanceMeters } / 1000.0)} km"
-    val momentCount  = groups.sumOf { it.photoCount + it.videoCount + it.noteCount }.toString()
+    val tripCount   = remember(groups) { groups.size.toString() }
+    val distanceKm  = remember(groups) { "${"%.1f".format(groups.sumOf { it.totalDistanceMeters } / 1000.0)} km" }
+    val momentCount = remember(groups) { groups.sumOf { it.photoCount + it.videoCount + it.noteCount }.toString() }
 
     Row(
         modifier            = Modifier
@@ -453,7 +454,7 @@ private fun FilterChip(
                 else
                     Modifier.border(1.dp, bio.line, shape),
             )
-            .clickable(onClick = onClick)
+            .clickable(role = Role.Button, onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 6.dp),
         contentAlignment = Alignment.Center,
     ) {
@@ -497,9 +498,9 @@ private fun BiophilicTripCard(
 ) {
     var showMenu by remember { mutableStateOf(false) }
 
-    val momentCount  = (item.photoCount + item.videoCount + item.noteCount).toInt()
-    val distanceText = "${"%.1f".format(item.totalDistanceMeters / 1000.0)} km"
-    val momentsText  = "$momentCount moments"
+    val cardMomentCount = remember(item) { (item.photoCount + item.videoCount + item.noteCount).toInt() }
+    val distanceText    = remember(item) { "${"%.1f".format(item.totalDistanceMeters / 1000.0)} km" }
+    val momentsText     = remember(item) { "$cardMomentCount moments" }
 
     Card(
         modifier = Modifier
@@ -528,7 +529,7 @@ private fun BiophilicTripCard(
                 BiophilicMiniMap(
                     bio         = bio,
                     trackPoints = item.thumbnailPoints,
-                    momentCount = momentCount,
+                    momentCount = cardMomentCount,
                     modifier    = Modifier.fillMaxSize(),
                 )
             }

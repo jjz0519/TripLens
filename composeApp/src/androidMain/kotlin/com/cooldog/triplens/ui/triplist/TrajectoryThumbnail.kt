@@ -1,7 +1,6 @@
 package com.cooldog.triplens.ui.triplist
 
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -42,7 +41,7 @@ fun BiophilicMiniMap(
     momentCount: Int,
     modifier: Modifier = Modifier,
 ) {
-    Canvas(modifier = modifier.fillMaxSize()) {
+    Canvas(modifier = modifier) {
         // ── Background ────────────────────────────────────────────────────────
         drawRect(color = bio.mapLand)
 
