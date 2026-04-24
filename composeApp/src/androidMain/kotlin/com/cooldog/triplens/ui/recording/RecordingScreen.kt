@@ -152,16 +152,21 @@ fun RecordingScreen(
         // CameraMode.NONE: we manage camera position manually (initial zoom above +
         // the follow logic in RecordingActiveContent) rather than letting the component
         // drive it, which allows the user to freely pan and re-centre.
+        // MapLibre's getStyle callback may fire on a non-main thread (GL thread or bg thread
+        // depending on load completion timing). All MapLibre component operations must be
+        // called on the main thread, so we post to the main looper to guarantee this.
         map.getStyle { style ->
-            val lc = map.locationComponent
-            if (!lc.isLocationComponentActivated) {
-                lc.activateLocationComponent(
-                    LocationComponentActivationOptions.builder(context, style).build()
-                )
+            android.os.Handler(android.os.Looper.getMainLooper()).post {
+                val lc = map.locationComponent
+                if (!lc.isLocationComponentActivated) {
+                    lc.activateLocationComponent(
+                        LocationComponentActivationOptions.builder(context, style).build()
+                    )
+                }
+                lc.isLocationComponentEnabled = true
+                lc.cameraMode = CameraMode.NONE
+                lc.renderMode = RenderMode.COMPASS
             }
-            lc.isLocationComponentEnabled = true
-            lc.cameraMode = CameraMode.NONE
-            lc.renderMode = RenderMode.COMPASS
         }
     }
 
@@ -259,8 +264,11 @@ fun RecordingScreen(
     val activeState = uiState as? RecordingViewModel.UiState.ActiveRecording
 
     // Reset media expansion when returning to idle so the next session starts at 40/60.
-    if (activeState == null) {
-        isMediaExpanded = false
+    // LaunchedEffect is used here instead of a direct state mutation in the composition body —
+    // mutating state directly during composition is a side effect that can cause recomposition
+    // loops and is flagged by the Compose snapshot system.
+    LaunchedEffect(activeState) {
+        if (activeState == null) isMediaExpanded = false
     }
 
     Column(modifier = Modifier.fillMaxSize()) {

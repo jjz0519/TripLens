@@ -178,7 +178,7 @@ internal fun RecordingIdleContent(
                     .background(bio.bg2),
             ) {
                 Icon(
-                    Icons.Outlined.Layers, contentDescription = null,
+                    Icons.Outlined.Layers, contentDescription = "Map layers",
                     tint = bio.ink2,
                     modifier = Modifier.size(14.dp),
                 )
@@ -199,7 +199,7 @@ internal fun RecordingIdleContent(
                 .border(1.dp, bio.line2, RoundedCornerShape(12.dp)),
         ) {
             Icon(
-                Icons.Outlined.MyLocation, contentDescription = null,
+                Icons.Outlined.MyLocation, contentDescription = "Re-center map",
                 tint = bio.mossDeep,
                 modifier = Modifier.size(18.dp),
             )
