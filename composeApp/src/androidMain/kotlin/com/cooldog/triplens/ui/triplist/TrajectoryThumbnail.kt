@@ -128,18 +128,14 @@ fun BiophilicMiniMap(
                 repeat(dotCount) { i ->
                     val idx = ((i + 1) * step).toInt().coerceAtMost(innerPoints.lastIndex)
                     val center = innerPoints[idx]
-                    // White ring
+                    // Draw filled sun circle first so the white ring is visible on top.
+                    drawCircle(bio.sun, radius = 2.5.dp.toPx(), center = center)
+                    // White stroke ring on top — drawn second so it is not obscured.
                     drawCircle(
-                        color  = Color.White,
-                        radius = (2.5.dp + 1.dp).toPx(),
-                        center = center,
-                        style  = Stroke(width = 1.dp.toPx()),
-                    )
-                    // Inner sun-yellow fill
-                    drawCircle(
-                        color  = bio.sun,
+                        Color.White,
                         radius = 2.5.dp.toPx(),
                         center = center,
+                        style  = Stroke(1.dp.toPx()),
                     )
                 }
             }
