@@ -43,6 +43,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -404,12 +405,16 @@ internal fun RecordingActiveContent(
         //   available.y > 0 → user dragging finger DOWN → list scrolls up
         //     + scrollState.value == 0 → already at top → collapse
         val scrollState = rememberScrollState()
+        // rememberUpdatedState ensures the lambda captured inside the bare remember{} block
+        // always calls the latest onMediaScrollChanged from the current composition, avoiding
+        // stale-closure bugs if the caller's lambda identity changes between recompositions.
+        val currentOnMediaScrollChanged by rememberUpdatedState(onMediaScrollChanged)
         val scrollConnection = remember {
             object : NestedScrollConnection {
                 override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
                     when {
-                        available.y < 0 -> onMediaScrollChanged(true)
-                        available.y > 0 && scrollState.value == 0 -> onMediaScrollChanged(false)
+                        available.y < 0 -> currentOnMediaScrollChanged(true)
+                        available.y > 0 && scrollState.value == 0 -> currentOnMediaScrollChanged(false)
                     }
                     return Offset.Zero  // never consume — let the Column scroll normally
                 }
@@ -533,7 +538,9 @@ private fun MomentTimelineRow(item: MediaItem, bio: BiophilicColors) {
             iconFg  = bio.clay
             icon    = Icons.Outlined.Mic
             label   = "Voice"
-            preview = "0:%02d".format(item.durationSeconds)
+            // Proper minute:second formatting handles recordings >= 60 s correctly.
+            // Old "0:%02d" would display "0:75" for a 75-second clip; this gives "1:15".
+            preview = "%d:%02d".format(item.durationSeconds / 60, item.durationSeconds % 60)
         }
     }
 
@@ -661,16 +668,20 @@ private fun RecordingBottomDock(
 // Utility functions
 // ---------------------------------------------------------------------------
 
+// File-level singleton formatter — avoids allocating a new SimpleDateFormat on every
+// timeline recomposition. SimpleDateFormat is not thread-safe, but Compose recompositions
+// always run on the main thread, so sharing this instance is safe here.
+private val capturedAtFormatter = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault())
+
 /**
  * Formats a [MediaItem.capturedAt] epoch-millisecond timestamp as "HH:mm" local time.
  *
- * Uses [java.text.SimpleDateFormat] with the device locale so AM/PM vs. 24-hour display
- * respects user preference. Shown on each timeline row card.
+ * Uses [capturedAtFormatter] (device locale) so AM/PM vs. 24-hour display respects user
+ * preference. The formatter is a file-level val to avoid per-call allocation. Shown on
+ * each timeline row card.
  */
-private fun formatCapturedAt(epochMs: Long): String {
-    val fmt = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault())
-    return fmt.format(java.util.Date(epochMs))
-}
+private fun formatCapturedAt(epochMs: Long): String =
+    capturedAtFormatter.format(java.util.Date(epochMs))
 
 /**
  * Formats an elapsed duration in seconds to a zero-padded HH:MM:SS string.
