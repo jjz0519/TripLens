@@ -2,21 +2,46 @@ package com.cooldog.triplens.ui
 
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Map
-import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.outlined.Map
+import androidx.compose.material.icons.outlined.Mic
+import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.cooldog.triplens.R
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -43,6 +68,7 @@ import com.cooldog.triplens.ui.settings.SettingsScreen
 import com.cooldog.triplens.ui.settings.SettingsViewModel
 import com.cooldog.triplens.ui.triplist.TripListScreen
 import com.cooldog.triplens.ui.triplist.TripListViewModel
+import com.cooldog.triplens.ui.theme.LocalBiophilicColors
 import org.koin.androidx.compose.koinViewModel
 import org.koin.core.parameter.parametersOf
 
@@ -142,8 +168,11 @@ fun AppNavGraph(
  * Bottom navigation bar shown only on top-level destinations (TripList, Recording, Settings).
  * Hidden on detail screens (TripDetail, SessionReview) so the user can focus on detail content.
  *
- * The Record tab icon is static (not pulsing). [isSessionActive] is kept in the API for
- * potential future use (e.g. badge dot on the Record tab).
+ * Biophilic design (Task 21):
+ * - Active tab: pill with mossPale2 background and mossDeep icon/text.
+ * - Record tab while recording: pill tinted recordRed @ 14% alpha; pulsing 8dp red dot beside icon.
+ * - Inactive tab: transparent pill, ink2 icon/text.
+ * - Container: bio.surface background with a 1dp top divider in bio.line2.
  */
 @Composable
 private fun AppBottomNavBar(
@@ -157,31 +186,108 @@ private fun AppBottomNavBar(
         it.hasRoute<TripListRoute>() || it.hasRoute<RecordingRoute>() || it.hasRoute<SettingsRoute>()
     } ?: false
 
-    if (showBottomBar) {
-        NavigationBar {
-            NavigationBarItem(
-                icon = { Icon(Icons.Default.Map, contentDescription = stringResource(R.string.nav_trips)) },
-                label = { Text(stringResource(R.string.nav_trips)) },
-                selected = currentDestination?.hasRoute<TripListRoute>() ?: false,
-                onClick = { navigateTopLevel(navController, TripListRoute) },
-            )
-            NavigationBarItem(
-                icon = {
-                    Icon(
-                        Icons.Default.Mic,
-                        contentDescription = stringResource(R.string.nav_record),
-                    )
-                },
-                label = { Text(stringResource(R.string.nav_record)) },
-                selected = currentDestination?.hasRoute<RecordingRoute>() ?: false,
-                onClick = { navigateTopLevel(navController, RecordingRoute) },
-            )
-            NavigationBarItem(
-                icon = { Icon(Icons.Default.Settings, contentDescription = stringResource(R.string.nav_settings)) },
-                label = { Text(stringResource(R.string.nav_settings)) },
-                selected = currentDestination?.hasRoute<SettingsRoute>() ?: false,
-                onClick = { navigateTopLevel(navController, SettingsRoute) },
-            )
+    if (!showBottomBar) return
+
+    // Tab descriptor: route object, string label, outlined icon.
+    val tabs: List<Triple<Any, String, ImageVector>> = listOf(
+        Triple(TripListRoute,  stringResource(R.string.nav_trips),    Icons.Outlined.Map),
+        Triple(RecordingRoute, stringResource(R.string.nav_record),   Icons.Outlined.Mic),
+        Triple(SettingsRoute,  stringResource(R.string.nav_settings), Icons.Outlined.Settings),
+    )
+
+    val bio = LocalBiophilicColors.current
+
+    Surface(color = bio.surface) {
+        Column {
+            // 1dp top border separating the nav bar from screen content.
+            HorizontalDivider(color = bio.line2, thickness = 1.dp)
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 8.dp)
+                    .navigationBarsPadding(),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+            ) {
+                tabs.forEach { (route, label, icon) ->
+                    val active = currentDestination?.hasRoute(route::class) ?: false
+                    val isRecord = route == RecordingRoute
+
+                    // Pill background and content color follow the biophilic spec:
+                    // recording-active Record tab uses a red tint; other active tabs use moss;
+                    // inactive tabs are fully transparent so only the text/icon are tinted.
+                    val pillBg = when {
+                        active && isRecord && isSessionActive -> bio.recordRed.copy(alpha = 0.14f)
+                        active -> bio.mossPale2
+                        else -> Color.Transparent
+                    }
+                    val contentColor = when {
+                        active && isRecord && isSessionActive -> bio.recordRed
+                        active -> bio.mossDeep
+                        else -> bio.ink2
+                    }
+
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(22.dp))
+                            .clickable { navigateTopLevel(navController, route) }
+                            .padding(vertical = 4.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        // Pill containing icon (+ optional pulsing dot for active recording).
+                        Row(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(999.dp))
+                                .background(pillBg)
+                                .padding(horizontal = 18.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center,
+                        ) {
+                            Icon(
+                                imageVector = icon,
+                                contentDescription = label,
+                                tint = contentColor,
+                                modifier = Modifier.size(22.dp),
+                            )
+
+                            // Pulsing red dot — only shown while a recording session is active
+                            // on the Record tab. Alpha animates 1f → 0.3f at 700ms to signal
+                            // background activity without being visually distracting.
+                            if (isRecord && isSessionActive) {
+                                val infiniteTransition = rememberInfiniteTransition(
+                                    label = "recordDotPulse"
+                                )
+                                val dotAlpha by infiniteTransition.animateFloat(
+                                    initialValue = 1f,
+                                    targetValue = 0.3f,
+                                    animationSpec = infiniteRepeatable(
+                                        animation = tween(durationMillis = 700),
+                                        repeatMode = RepeatMode.Reverse,
+                                    ),
+                                    label = "recordDotAlpha",
+                                )
+                                Spacer(modifier = Modifier.size(4.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .size(8.dp)
+                                        .clip(CircleShape)
+                                        .background(bio.recordRed.copy(alpha = dotAlpha)),
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(2.dp))
+
+                        Text(
+                            text = label,
+                            color = contentColor,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium,
+                        )
+                    }
+                }
+            }
         }
     }
 }
