@@ -1,17 +1,15 @@
 package com.cooldog.triplens.ui.recording
 
-import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -21,19 +19,23 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material.icons.filled.MicOff
 import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.outlined.CameraAlt
+import androidx.compose.material.icons.outlined.Mic
+import androidx.compose.material.icons.outlined.MicOff
+import androidx.compose.material.icons.outlined.MyLocation
+import androidx.compose.material.icons.outlined.Pause
+import androidx.compose.material.icons.outlined.Photo
+import androidx.compose.material.icons.outlined.TextFields
+import androidx.compose.material.icons.outlined.Videocam
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -41,22 +43,25 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.cooldog.triplens.R
-import com.cooldog.triplens.ui.common.PhotoCard
-import com.cooldog.triplens.ui.common.TextNoteCard
-import com.cooldog.triplens.ui.common.VoiceNoteCard
+import androidx.compose.ui.unit.em
+import androidx.compose.ui.unit.sp
+import com.cooldog.triplens.domain.HaversineUtils
+import com.cooldog.triplens.model.TrackPoint
+import com.cooldog.triplens.ui.theme.BiophilicColors
+import com.cooldog.triplens.ui.theme.InstrumentSerifFamily
+import com.cooldog.triplens.ui.theme.LocalBiophilicColors
 import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.maps.MapLibreMap
@@ -67,102 +72,153 @@ import org.maplibre.android.style.layers.PropertyFactory
 import org.maplibre.android.style.sources.GeoJsonSource
 import org.maplibre.geojson.FeatureCollection
 
+// ---------------------------------------------------------------------------
+// Distance helper
+// ---------------------------------------------------------------------------
+
 /**
- * Top bar overlaid on the map during an active recording session.
+ * Computes the total haversine path distance across the given track points, in kilometres.
+ *
+ * Delegates to [HaversineUtils.totalDistance] which handles the consecutive-pair summation
+ * and returns 0.0 for fewer than 2 points.
+ */
+internal fun computeDistanceKm(points: List<TrackPoint>): Float =
+    (HaversineUtils.totalDistance(points) / 1000.0).toFloat()
+
+// ---------------------------------------------------------------------------
+// Top bar
+// ---------------------------------------------------------------------------
+
+/**
+ * Biophilic top bar overlaid on the map during an active recording session.
  *
  * Layout (left → right):
- *   [● groupName]   [HH:MM:SS]   [■ Stop]
+ *   [ProgressRing (60 dp)]   [● RECORDING / timer / km]   (stop is moved to bottom dock)
  *
- * - The red dot pulses 1.0 → 0.3 alpha on an 800 ms cycle to signal "live recording".
- * - Timer always shows hours (even "00") to avoid a layout-width shift at 59:59 → 1:00:00.
- * - Stop button is filled red — clearly destructive, clearly terminates the session.
+ * The [ProgressRing] renders:
+ * - A faint track ring (full 1-hour span)
+ * - A green elapsed arc sweeping clockwise from 12 o'clock
+ * - Up to 12 moment-petal dots orbiting the ring
+ * - A pulsing red centre dot
  *
- * Overlaid on the map (not above it) so the map retains its full weight(0.6f) allocation;
- * only the top ~56 dp is occluded, which is acceptable because no meaningful map data sits
- * in that strip.
+ * The pulsing "RECORDING" label (700 ms Reverse cycle) provides a second visual cue that
+ * the session is live without relying on the ring colour alone.
+ *
+ * @param groupName      Trip group name displayed next to the timer.
+ * @param elapsedSeconds Session elapsed time in seconds.
+ * @param momentCount    Number of captured moments; drives ProgressRing petal count.
+ * @param distanceKm     Accumulated haversine distance in kilometres; shown next to timer.
+ * @param onStopTapped   Callback forwarded to [RecordingViewModel.onStopTapped].
+ * @param modifier       Caller-supplied modifier (typically fillMaxWidth + align TopStart).
  */
 @Composable
 internal fun RecordingActiveTopBar(
     groupName: String,
     elapsedSeconds: Long,
+    momentCount: Int,
+    distanceKm: Float,
     onStopTapped: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    // Pulsing red recording indicator — 800 ms reverse cycle conveys "live".
-    val infiniteTransition = rememberInfiniteTransition(label = "recordingDotPulse")
+    val bio = LocalBiophilicColors.current
+
+    // Pulsing alpha on "RECORDING" label — 700 ms Reverse cycle is fast enough to feel live
+    // without being distracting during navigation.
+    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
     val dotAlpha by infiniteTransition.animateFloat(
         initialValue = 1f,
         targetValue = 0.3f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 800, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse,
-        ),
-        label = "recordingDotAlpha",
+        animationSpec = infiniteRepeatable(tween(700), RepeatMode.Reverse),
+        label = "dotAlpha",
     )
 
     Surface(
         modifier = modifier,
-        // Semi-opaque so the map is still visible behind the top bar.
-        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
-        shadowElevation = 4.dp,
+        // Semi-opaque so the map is still readable behind the top bar.
+        color = bio.surface.copy(alpha = 0.92f),
+        shadowElevation = 2.dp,
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(56.dp)
-                .padding(horizontal = 12.dp),
+                .padding(horizontal = 16.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            // ── Left: pulsing dot + trip group name ───────────────────────────────
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.weight(1f),
-            ) {
-                // 8 dp solid circle pulsing in red — universally understood "recording" symbol.
-                Box(
-                    modifier = Modifier
-                        .size(8.dp)
-                        .alpha(dotAlpha)
-                        .background(Color.Red, shape = CircleShape),
-                )
-                Spacer(Modifier.width(6.dp))
-                Text(
-                    text = groupName,
-                    style = MaterialTheme.typography.bodyMedium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-
-            // ── Center: HH:MM:SS elapsed timer ────────────────────────────────────
-            // Monospace font keeps the digits from jumping as numbers change width.
-            Text(
-                text = formatElapsedTime(elapsedSeconds),
-                style = MaterialTheme.typography.titleMedium.copy(fontFamily = FontFamily.Monospace),
-                modifier = Modifier.padding(horizontal = 8.dp),
+            // ProgressRing gives an at-a-glance elapsed/moment summary without needing text.
+            ProgressRing(
+                elapsedSeconds = elapsedSeconds,
+                momentCount = momentCount,
+                paused = false,  // no pause state in ViewModel; always show recording colour
+                bio = bio,
+                modifier = Modifier.size(60.dp),
             )
 
-            // ── Right: Stop button ─────────────────────────────────────────────────
-            Button(
-                onClick = onStopTapped,
-                colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
-                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                modifier = Modifier.height(36.dp),
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Stop,
-                    contentDescription = stringResource(R.string.recording_stop_content_desc),
-                    modifier = Modifier.size(18.dp),
-                )
-                Spacer(Modifier.width(4.dp))
-                Text(text = stringResource(R.string.recording_stop_button), style = MaterialTheme.typography.labelMedium)
+            Column(modifier = Modifier.weight(1f)) {
+                // Live badge — pulsing dot + "RECORDING" label in recordRed
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(7.dp)
+                            .clip(CircleShape)
+                            .background(bio.recordRed.copy(alpha = dotAlpha)),
+                    )
+                    Text(
+                        text = "RECORDING",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = bio.recordRed,
+                        letterSpacing = 0.6.sp,
+                    )
+                }
+
+                // Timer row: HH:MM:SS | distance
+                Row(
+                    verticalAlignment = Alignment.Bottom,
+                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                    modifier = Modifier.padding(top = 4.dp),
+                ) {
+                    // InstrumentSerif gives the numerals a warm, analogue-instrument feel
+                    // consistent with the biophilic design language.
+                    Text(
+                        text = formatElapsedTime(elapsedSeconds),
+                        fontFamily = InstrumentSerifFamily,
+                        fontSize = 26.sp,
+                        color = bio.ink,
+                        letterSpacing = (-0.02).em,
+                    )
+                    // Thin vertical divider between timer and distance
+                    Box(
+                        modifier = Modifier
+                            .width(1.dp)
+                            .height(16.dp)
+                            .background(bio.line)
+                            .align(Alignment.CenterVertically),
+                    )
+                    Row(verticalAlignment = Alignment.Bottom) {
+                        Text(
+                            text = "%.2f".format(distanceKm),
+                            fontFamily = InstrumentSerifFamily,
+                            fontSize = 19.sp,
+                            color = bio.ink2,
+                        )
+                        Text(text = " km", fontSize = 12.sp, color = bio.ink3)
+                    }
+                }
             }
         }
     }
 }
 
+// ---------------------------------------------------------------------------
+// Bottom panel + MapLibre side-effects
+// ---------------------------------------------------------------------------
+
 /**
- * Bottom panel + MapLibre side-effects for the active recording state.
+ * Bottom panel and MapLibre side-effects for the active recording state.
  *
  * ## MapLibre side-effects (three LaunchedEffect / DisposableEffect blocks)
  *
@@ -187,26 +243,30 @@ internal fun RecordingActiveTopBar(
  *
  * ## Bottom panel layout
  * ```
- * ┌────────────────────────────────────┐
- * │  [✏ Text Note]   [🎙 Voice Note]  │  ← action row (weight split)
- * │  [Re-center]  ← shown when off    │
- * │  [photo] [photo] [note] [voice] → │  ← LazyRow media strip, 10 items max
- * └────────────────────────────────────┘
+ * ┌────────────────────────────────────────────────┐
+ * │  [Text]   [Voice]   [Photo]   ← capture bar    │
+ * │  ──── moment timeline (scrollable) ────         │
+ * │  [Pause]   [● STOP ●]   [Re-center]            │  ← bottom dock
+ * └────────────────────────────────────────────────┘
  * ```
  *
- * @param state              Active recording state snapshot (polled every 5 s by the ViewModel).
- * @param mapLibreMap        Non-null only after [RecordingScreen] receives the style-loaded callback.
- * @param onTextNoteTapped   Opens the text note sheet in [RecordingScreen].
- * @param onVoiceNoteStart   Starts the voice recorder via the ViewModel.
- * @param onVoiceNoteStop    Stops the voice recorder and saves the note via the ViewModel.
- * @param onMapPanned        Disables camera auto-follow — called by the gesture listener.
- * @param onRecenterTapped   Re-enables camera auto-follow — bound to the Re-center button.
+ * @param state                Active recording state snapshot (polled every 5 s by the ViewModel).
+ * @param mapLibreMap          Non-null only after [RecordingScreen] receives the style-loaded callback.
+ * @param onStopTapped         Forwards to [RecordingViewModel.onStopTapped].
+ * @param onTextNoteTapped     Opens the text note sheet in [RecordingScreen].
+ * @param onVoiceNoteStart     Starts the voice recorder via the ViewModel.
+ * @param onVoiceNoteStop      Stops the voice recorder and saves the note via the ViewModel.
+ * @param onMapPanned          Disables camera auto-follow — called by the gesture listener.
+ * @param onRecenterTapped     Re-enables camera auto-follow — bound to the Re-center dock button.
+ * @param onMediaScrollChanged Called with true when the media list is scrolled down (expand panel),
+ *                             false when scrolled back to the top (restore default ratio).
+ * @param modifier             Caller-supplied modifier (typically fillMaxWidth + weight).
  */
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun RecordingActiveContent(
     state: RecordingViewModel.UiState.ActiveRecording,
     mapLibreMap: MapLibreMap?,
+    onStopTapped: () -> Unit,
     onTextNoteTapped: () -> Unit,
     onVoiceNoteStart: () -> Unit,
     onVoiceNoteStop: () -> Unit,
@@ -217,6 +277,8 @@ internal fun RecordingActiveContent(
     onMediaScrollChanged: (isScrolledDown: Boolean) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
+    val bio = LocalBiophilicColors.current
+
     // ── Map side-effect 1: one-time layer setup ────────────────────────────────────
     //
     // Runs when mapLibreMap first becomes non-null (style loaded). Guards with null checks
@@ -296,58 +358,46 @@ internal fun RecordingActiveContent(
 
     // ── Bottom panel ────────────────────────────────────────────────────────────────
 
-    Column(modifier = modifier.padding(vertical = 8.dp)) {
+    Column(modifier = modifier) {
 
-        // ── Action row: Text Note + Voice Note buttons ─────────────────────────────
+        // ── Capture bar: Text / Voice / Photo ──────────────────────────────────────
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            FilledTonalButton(
+            CaptureButton(
+                label = "Text",
+                bg = bio.mossPale,
+                fg = bio.mossDeep,
+                icon = Icons.Outlined.TextFields,
                 onClick = onTextNoteTapped,
                 modifier = Modifier.weight(1f),
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Edit,
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp),
-                )
-                Spacer(Modifier.width(6.dp))
-                Text(stringResource(R.string.recording_text_note_button))
-            }
-
-            VoiceNoteButton(
-                isRecording = state.isVoiceRecording,
-                voiceElapsedSeconds = state.voiceElapsedSeconds,
-                onVoiceNoteStart = onVoiceNoteStart,
-                onVoiceNoteStop = onVoiceNoteStop,
+            )
+            CaptureButton(
+                label = "Voice",
+                bg = bio.clay.copy(alpha = 0.1f),
+                fg = bio.clay,
+                icon = if (state.isVoiceRecording) Icons.Outlined.MicOff else Icons.Outlined.Mic,
+                onClick = if (state.isVoiceRecording) onVoiceNoteStop else onVoiceNoteStart,
+                modifier = Modifier.weight(1f),
+            )
+            CaptureButton(
+                label = "Photo",
+                bg = bio.sun.copy(alpha = 0.1f),
+                fg = bio.sun,
+                icon = Icons.Outlined.CameraAlt,
+                onClick = { /* stub — camera capture not yet implemented */ },
                 modifier = Modifier.weight(1f),
             )
         }
 
-        // Re-center appears only when the user has panned away from the GPS dot.
-        if (!state.isCameraFollowing) {
-            OutlinedButton(
-                onClick = onRecenterTapped,
-                modifier = Modifier
-                    .align(Alignment.CenterHorizontally)
-                    .padding(top = 4.dp),
-            ) {
-                Text(stringResource(R.string.recording_recenter_button), style = MaterialTheme.typography.labelMedium)
-            }
-        }
-
-        Spacer(Modifier.height(8.dp))
-
-        // ── Media flow grid ────────────────────────────────────────────────────────
-        // FlowRow packs items left-to-right and wraps to new rows automatically.
+        // ── Moment timeline (scrollable) ──────────────────────────────────────────
         //
-        // Expansion trigger: NestedScrollConnection.onPreScroll fires with the user's
-        // raw drag delta before layout runs — this avoids the feedback loop that occurs
-        // when reacting to scrollState.value, which gets clamped to 0 whenever the
-        // expanded panel makes all content fit (causing immediate auto-collapse).
+        // NestedScrollConnection detects scroll direction before layout to avoid the
+        // clamping feedback loop that occurs when reacting to scrollState.value == 0
+        // while the expanded panel makes all content fit.
         //
         // Sign convention (Compose nested scroll):
         //   available.y < 0 → user dragging finger UP   → list scrolls down → expand
@@ -361,121 +411,266 @@ internal fun RecordingActiveContent(
                         available.y < 0 -> onMediaScrollChanged(true)
                         available.y > 0 && scrollState.value == 0 -> onMediaScrollChanged(false)
                     }
-                    return Offset.Zero  // never consume — let the FlowRow scroll normally
+                    return Offset.Zero  // never consume — let the Column scroll normally
                 }
             }
         }
 
-        if (state.recentMedia.isEmpty()) {
-            Text(
-                text = stringResource(R.string.recording_media_empty),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 16.dp),
-            )
-        } else {
-            FlowRow(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .nestedScroll(scrollConnection)
-                    .verticalScroll(scrollState)
-                    .padding(horizontal = 16.dp, vertical = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .nestedScroll(scrollConnection)
+                .verticalScroll(scrollState)
+                .padding(horizontal = 16.dp),
+        ) {
+            if (state.recentMedia.isEmpty()) {
+                Text(
+                    text = "No moments yet — tap Text, Voice, or Photo to capture.",
+                    fontSize = 12.sp,
+                    color = bio.ink3,
+                    modifier = Modifier.padding(vertical = 16.dp),
+                )
+            } else {
                 state.recentMedia.forEach { item ->
-                    MediaListItem(item)
+                    MomentTimelineRow(item, bio)
                 }
             }
+            Spacer(Modifier.height(8.dp))
         }
+
+        // ── Bottom dock: Pause / Stop / Re-center ─────────────────────────────────
+        RecordingBottomDock(
+            onStop = onStopTapped,
+            onPause = { /* stub — no pause state in ViewModel */ },
+            onRecenter = onRecenterTapped,
+            bio = bio,
+        )
     }
 }
 
+// ---------------------------------------------------------------------------
+// Private helper composables
+// ---------------------------------------------------------------------------
+
 /**
- * Voice note button with two visual states:
- * - **Idle**: FilledTonal style with Mic icon — tap to start recording.
- * - **Recording**: Red filled style with pulsing alpha + elapsed M:SS — tap to stop.
+ * Pill-shaped capture button used in the three-button capture bar (Text / Voice / Photo).
  *
- * The pulsing animation is self-contained here so [rememberInfiniteTransition] is only
- * allocated while voice recording is active (conditional call is safe because this whole
- * composable is conditionally rendered by [RecordingActiveContent]).
- *
- * Voice note elapsed time uses M:SS (not HH:MM:SS) because recordings are expected to be
- * short; displaying hours would waste width and confuse users.
+ * Using explicit bg/fg parameters (rather than MaterialTheme roles) lets each button carry
+ * its own biophilic colour identity without requiring three separate ButtonColors objects
+ * at the call site.
  */
 @Composable
-private fun VoiceNoteButton(
-    isRecording: Boolean,
-    voiceElapsedSeconds: Long,
-    onVoiceNoteStart: () -> Unit,
-    onVoiceNoteStop: () -> Unit,
+private fun CaptureButton(
+    label: String,
+    bg: Color,
+    fg: Color,
+    icon: ImageVector,
+    onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    if (isRecording) {
-        // Pulsing alpha on the recording button signals "active microphone" without obscuring text.
-        val infiniteTransition = rememberInfiniteTransition(label = "voicePulse")
-        val buttonAlpha by infiniteTransition.animateFloat(
-            initialValue = 1f,
-            targetValue = 0.5f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(durationMillis = 600, easing = LinearEasing),
-                repeatMode = RepeatMode.Reverse,
-            ),
-            label = "voiceButtonAlpha",
-        )
-        val m = voiceElapsedSeconds / 60
-        val s = voiceElapsedSeconds % 60
-        Button(
-            onClick = onVoiceNoteStop,
-            colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
-            modifier = modifier.alpha(buttonAlpha),
-        ) {
-            Icon(
-                imageVector = Icons.Default.MicOff,
-                contentDescription = stringResource(R.string.recording_voice_stop_content_desc),
-                modifier = Modifier.size(16.dp),
-            )
-            Spacer(Modifier.width(6.dp))
-            Text("%d:%02d".format(m, s))
+    Button(
+        onClick = onClick,
+        modifier = modifier.height(48.dp),
+        shape = RoundedCornerShape(16.dp),
+        colors = ButtonDefaults.buttonColors(containerColor = bg, contentColor = fg),
+        // Zero elevation: the subtle tinted background already differentiates each button;
+        // a shadow would look heavy against the biophilic surface.
+        elevation = ButtonDefaults.buttonElevation(0.dp),
+        contentPadding = PaddingValues(horizontal = 14.dp),
+    ) {
+        Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(8.dp))
+        Text(label, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+/**
+ * Single row in the moment timeline for one captured [MediaItem].
+ *
+ * Layout: [icon circle]  [label card with type + time + optional preview text]
+ *
+ * Colour coding:
+ * - Text note → moss green (same palette as the capture button)
+ * - Photo/Video → sun amber
+ * - Voice note → clay brown
+ *
+ * The card is intentionally minimal (no thumbnails, no waveform) so the timeline stays
+ * compact; the goal is a chronological log, not a media browser.
+ */
+@Composable
+private fun MomentTimelineRow(item: MediaItem, bio: BiophilicColors) {
+    // Destructure type-specific display properties with a when block.
+    // Quintuple/tuple destructuring is not available in Kotlin; using separate vars is idiomatic.
+    val iconBg: Color
+    val iconFg: Color
+    val icon: ImageVector
+    val label: String
+    val preview: String
+    when (item) {
+        is MediaItem.TextNote  -> {
+            iconBg  = bio.mossPale
+            iconFg  = bio.mossDeep
+            icon    = Icons.Outlined.TextFields
+            label   = "Note"
+            preview = item.preview
         }
-    } else {
-        FilledTonalButton(
-            onClick = onVoiceNoteStart,
-            modifier = modifier,
+        is MediaItem.Photo     -> {
+            iconBg  = bio.sun.copy(alpha = 0.12f)
+            iconFg  = bio.sun
+            icon    = Icons.Outlined.Photo
+            label   = "Photo"
+            preview = ""
+        }
+        is MediaItem.Video     -> {
+            iconBg  = bio.sun.copy(alpha = 0.12f)
+            iconFg  = bio.sun
+            icon    = Icons.Outlined.Videocam
+            label   = "Video"
+            preview = ""
+        }
+        is MediaItem.VoiceNote -> {
+            iconBg  = bio.clay.copy(alpha = 0.1f)
+            iconFg  = bio.clay
+            icon    = Icons.Outlined.Mic
+            label   = "Voice"
+            preview = "0:%02d".format(item.durationSeconds)
+        }
+    }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .size(28.dp)
+                .clip(CircleShape)
+                .background(iconBg),
+            contentAlignment = Alignment.Center,
         ) {
-            Icon(
-                imageVector = Icons.Default.Mic,
-                contentDescription = stringResource(R.string.recording_voice_start_content_desc),
-                modifier = Modifier.size(16.dp),
-            )
-            Spacer(Modifier.width(6.dp))
-            Text(stringResource(R.string.recording_voice_note_button))
+            Icon(icon, contentDescription = null, tint = iconFg, modifier = Modifier.size(14.dp))
+        }
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .clip(RoundedCornerShape(14.dp))
+                .background(bio.surface)
+                .border(1.dp, bio.line2, RoundedCornerShape(14.dp))
+                .padding(horizontal = 14.dp, vertical = 8.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(label, fontSize = 13.sp, fontWeight = FontWeight.Medium, color = bio.ink)
+                Text(formatCapturedAt(item.capturedAt), fontSize = 11.sp, color = bio.ink3)
+            }
+            if (preview.isNotBlank()) {
+                Text(
+                    text = preview,
+                    fontSize = 12.sp,
+                    color = bio.ink3,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = 2.dp),
+                )
+            }
         }
     }
 }
 
 /**
- * Single row in the media [LazyColumn].
+ * Bottom dock with Pause (stub), Stop, and Re-center controls.
  *
- * Each type has a fixed 64 dp height; widths differ by type:
- * - **Photo**: height=64dp, width = natural aspect ratio (wrapContentWidth).
- * - **Video**: same as Photo; uses [VideoFrameDecoder] so Coil extracts the first frame
- *   directly from the video file rather than relying on a pre-generated thumbnail.
- * - **TextNote**: 64dp × 100dp — text fills the card with wrapping, no icon.
- * - **VoiceNote**: 64dp × 100dp — mic icon + M:SS duration, no animation.
+ * The Stop button is deliberately large (72 dp) and prominently red — it is a destructive,
+ * high-consequence action and needs to be clearly identifiable under physical activity.
+ * The outer 84 dp ring adds a visual "press target" halo that draws the eye without
+ * increasing the actual tap area (IconButton provides a 48 dp minimum already).
+ *
+ * Pause is a stub because the ViewModel currently has no pause state; the button occupies
+ * its space now so the dock layout won't shift when pause is added later.
  */
 @Composable
-private fun MediaListItem(item: MediaItem) {
-    when (item) {
-        is MediaItem.Photo  -> PhotoCard(contentUri = item.contentUri, isVideo = false)
-        is MediaItem.Video  -> PhotoCard(contentUri = item.contentUri, isVideo = true)
-        is MediaItem.TextNote  -> TextNoteCard(item)
-        is MediaItem.VoiceNote -> VoiceNoteCard(item)
+private fun RecordingBottomDock(
+    onStop: () -> Unit,
+    onPause: () -> Unit,
+    onRecenter: () -> Unit,
+    bio: BiophilicColors,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.SpaceEvenly,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        // Pause — stub; always enabled so the layout is stable when pause is implemented
+        IconButton(
+            onClick = onPause,
+            modifier = Modifier
+                .size(52.dp)
+                .clip(CircleShape)
+                .background(bio.surface)
+                .border(1.dp, bio.line2, CircleShape),
+        ) {
+            Icon(Icons.Outlined.Pause, contentDescription = "Pause", tint = bio.ink2, modifier = Modifier.size(20.dp))
+        }
+
+        // Stop — large red circle; outer ring provides a press-target halo
+        Box(contentAlignment = Alignment.Center) {
+            Box(
+                modifier = Modifier
+                    .size(84.dp)
+                    .clip(CircleShape)
+                    .border(2.dp, bio.recordRed.copy(alpha = 0.25f), CircleShape),
+            )
+            IconButton(
+                onClick = onStop,
+                modifier = Modifier
+                    .size(72.dp)
+                    .clip(CircleShape)
+                    .background(bio.recordRed),
+            ) {
+                Icon(
+                    Icons.Filled.Stop,
+                    contentDescription = "Stop recording",
+                    tint = Color.White,
+                    modifier = Modifier.size(26.dp),
+                )
+            }
+        }
+
+        // Re-center — always visible (occupies same space whether following or not)
+        // so the dock layout doesn't shift when the user pans and re-centres.
+        IconButton(
+            onClick = onRecenter,
+            modifier = Modifier
+                .size(52.dp)
+                .clip(CircleShape)
+                .background(bio.surface)
+                .border(1.dp, bio.line2, CircleShape),
+        ) {
+            Icon(Icons.Outlined.MyLocation, contentDescription = "Re-center", tint = bio.ink2, modifier = Modifier.size(20.dp))
+        }
     }
 }
 
-// PhotoCard, TextNoteCard, VoiceNoteCard live in ui/common/MediaItemCards.kt
-// and are imported above. They are shared with SessionReviewScreen.
+// ---------------------------------------------------------------------------
+// Utility functions
+// ---------------------------------------------------------------------------
+
+/**
+ * Formats a [MediaItem.capturedAt] epoch-millisecond timestamp as "HH:mm" local time.
+ *
+ * Uses [java.text.SimpleDateFormat] with the device locale so AM/PM vs. 24-hour display
+ * respects user preference. Shown on each timeline row card.
+ */
+private fun formatCapturedAt(epochMs: Long): String {
+    val fmt = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault())
+    return fmt.format(java.util.Date(epochMs))
+}
 
 /**
  * Formats an elapsed duration in seconds to a zero-padded HH:MM:SS string.

@@ -304,6 +304,8 @@ fun RecordingScreen(
                 RecordingActiveTopBar(
                     groupName = activeState.groupName,
                     elapsedSeconds = activeState.elapsedSeconds,
+                    momentCount = activeState.recentMedia.size,
+                    distanceKm = computeDistanceKm(activeState.trackPoints),
                     onStopTapped = { viewModel.onStopTapped() },
                     modifier = Modifier
                         .align(Alignment.TopStart)
@@ -334,6 +336,7 @@ fun RecordingScreen(
             RecordingActiveContent(
                 state = activeState,
                 mapLibreMap = mapLibreMap,
+                onStopTapped = { viewModel.onStopTapped() },
                 onTextNoteTapped = { showTextNoteSheet = true },
                 onVoiceNoteStart = { viewModel.onVoiceNoteStart() },
                 onVoiceNoteStop = { viewModel.onVoiceNoteStop() },
