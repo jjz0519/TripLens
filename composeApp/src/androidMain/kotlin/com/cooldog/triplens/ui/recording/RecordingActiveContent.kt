@@ -170,7 +170,7 @@ internal fun RecordingActiveTopBar(
                         text = "RECORDING",
                         fontSize = 11.sp,
                         fontWeight = FontWeight.SemiBold,
-                        color = bio.recordRed,
+                        color = bio.recordRed.copy(alpha = dotAlpha),
                         letterSpacing = 0.6.sp,
                     )
                 }
