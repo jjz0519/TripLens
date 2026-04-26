@@ -554,11 +554,11 @@ private fun SessionStat(
 ) {
     val bgColor = if (primary) bio.mossPale else bio.surface
     val valueColor = if (primary) bio.mossDeep else bio.ink
-    val borderMod = if (primary) Modifier else Modifier.border(1.dp, bio.line2, RoundedCornerShape(10.dp))
+    val borderMod = if (primary) Modifier else Modifier.border(1.dp, bio.line2, RoundedCornerShape(16.dp))
 
     Box(
         modifier = modifier
-            .clip(RoundedCornerShape(10.dp))
+            .clip(RoundedCornerShape(16.dp))
             .background(bgColor)
             .then(borderMod)
             .padding(horizontal = 10.dp, vertical = 8.dp),
@@ -993,7 +993,7 @@ private fun AudioWaveformRow(bio: BiophilicColors, durationSec: Int) {
 
         // Duration label
         Text(
-            text = "0:%02d".format(durationSec),
+            text = "%d:%02d".format(durationSec / 60, durationSec % 60),
             fontSize = 11.sp,
             color = bio.ink3,
         )

@@ -49,6 +49,7 @@ import com.cooldog.triplens.ui.theme.BiophilicColors
 import com.cooldog.triplens.ui.theme.InstrumentSerifFamily
 import com.cooldog.triplens.ui.theme.LocalBiophilicColors
 import com.cooldog.triplens.ui.theme.Palette
+import java.util.Locale
 
 /**
  * Settings screen — biophilic redesign (Task 27).
@@ -146,7 +147,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
 @Composable
 private fun SettingsSectionTitle(bio: BiophilicColors, title: String) {
     Text(
-        text          = title.uppercase(),
+        text          = title.uppercase(Locale.getDefault()),
         fontSize      = 11.sp,
         color         = bio.ink3,
         fontWeight    = FontWeight.SemiBold,
