@@ -7,6 +7,7 @@ import com.cooldog.triplens.data.AppPreferences
 import com.cooldog.triplens.data.Language
 import com.cooldog.triplens.data.ScanInterval
 import com.cooldog.triplens.platform.AccuracyProfile
+import com.cooldog.triplens.ui.theme.Palette
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -58,10 +59,12 @@ class SettingsViewModel(
     private val _language        = MutableStateFlow(Language.SYSTEM)
     private val _accuracyProfile = MutableStateFlow(AccuracyProfile.STANDARD)
     private val _scanInterval    = MutableStateFlow(ScanInterval.STANDARD)
+    private val _palette         = MutableStateFlow(Palette.MOSS)
 
     val language:        StateFlow<Language>        = _language.asStateFlow()
     val accuracyProfile: StateFlow<AccuracyProfile> = _accuracyProfile.asStateFlow()
     val scanInterval:    StateFlow<ScanInterval>    = _scanInterval.asStateFlow()
+    val palette:         StateFlow<Palette>         = _palette.asStateFlow()
 
     init {
         loadPreferences()
@@ -80,9 +83,11 @@ class SettingsViewModel(
                 _language.value        = appPreferences.getLanguage()
                 _accuracyProfile.value = appPreferences.getAccuracyProfile()
                 _scanInterval.value    = appPreferences.getScanInterval()
+                _palette.value         = appPreferences.getPalette()
             }
             Log.d(TAG, "Loaded preferences: language=${_language.value}, " +
-                    "profile=${_accuracyProfile.value}, scanInterval=${_scanInterval.value}")
+                    "profile=${_accuracyProfile.value}, scanInterval=${_scanInterval.value}, " +
+                    "palette=${_palette.value}")
         }
     }
 
@@ -119,6 +124,22 @@ class SettingsViewModel(
             } else {
                 Log.i(TAG, "Accuracy profile → $profile (no active session)")
             }
+        }
+    }
+
+    /**
+     * Persists the selected [palette] and updates the UI immediately.
+     * The theme wrapper in MainActivity observes this StateFlow and re-provides
+     * [LocalBiophilicColors] so all composables pick up the new palette without
+     * requiring an activity restart.
+     */
+    fun onPaletteSelected(palette: Palette) {
+        viewModelScope.launch {
+            withContext(ioDispatcher) {
+                appPreferences.setPalette(palette)
+            }
+            _palette.value = palette
+            Log.i(TAG, "Palette → $palette")
         }
     }
 
