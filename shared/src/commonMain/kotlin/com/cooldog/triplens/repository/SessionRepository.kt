@@ -47,6 +47,7 @@ class SessionRepository(private val db: AppDatabase) {
         name = name,
         startTime = start_time,
         endTime = end_time,
-        status = SessionStatus.valueOf(status.uppercase())
+        status = SessionStatus.valueOf(status.uppercase()),
+        distanceMeters = distance_meters ?: 0.0,
     )
 }

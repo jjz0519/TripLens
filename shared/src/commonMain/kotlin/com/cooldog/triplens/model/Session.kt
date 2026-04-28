@@ -9,5 +9,6 @@ data class Session(
     val name: String,
     val startTime: Long,         // epoch millis UTC
     val endTime: Long?,          // null while recording
-    val status: SessionStatus
+    val status: SessionStatus,
+    val distanceMeters: Double = 0.0, // running haversine distance; persisted every ~3 s by poll loop
 )

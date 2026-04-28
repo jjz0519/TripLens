@@ -128,6 +128,34 @@ class RecordingViewModel(private val deps: RecordingDeps) : ViewModel() {
     private var pollJob: Job? = null
     private var voiceTimerJob: Job? = null
 
+    // ── Rehydration — resume an active session from DB after process kill ────────
+
+    init {
+        viewModelScope.launch {
+            val active = withContext(deps.ioDispatcher) { deps.getActiveSessionFn() }
+                ?: return@launch
+            // Guard against a race where onStartTapped fired before this coroutine ran.
+            if (_uiState.value != UiState.Idle) return@launch
+
+            val groupName = withContext(deps.ioDispatcher) {
+                deps.getGroupNameFn(active.groupId) ?: active.name
+            }
+            // Seed elapsed from wall-clock difference so the timer shows the true session duration.
+            val elapsedSeconds = ((deps.clock() - active.startTime) / 1_000L).coerceAtLeast(0L)
+            _uiState.value = UiState.ActiveRecording(
+                sessionId      = active.id,
+                groupName      = groupName,
+                elapsedSeconds = elapsedSeconds,
+            )
+            Log.i(TAG, "Rehydrated from active session id=${active.id} elapsed=${elapsedSeconds}s")
+
+            // Don't emit NavigateToActiveRecording — AppViewModel already routed to this screen
+            // and set isSessionActive=true. Emitting the event would re-fire the bottom-nav pulse.
+            launchTimerLoop()
+            launchPollLoop(active.id)
+        }
+    }
+
     // ── Public API — idle state ──────────────────────────────────────────────────
 
     /**

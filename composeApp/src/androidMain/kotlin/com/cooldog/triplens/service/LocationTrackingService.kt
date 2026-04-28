@@ -97,6 +97,7 @@ class LocationTrackingService : Service() {
     private val trackPointRepo: TrackPointRepository by inject()
     private val mediaRefRepo:   MediaRefRepository   by inject()
     private val noteRepo:       NoteRepository       by inject()
+    private val sessionRepo:    com.cooldog.triplens.repository.SessionRepository by inject()
     private val locationProvider: LocationProvider   by inject()
     private val galleryScanner: GalleryScanner       by inject()
 
@@ -230,8 +231,15 @@ class LocationTrackingService : Service() {
                 AccuracyProfile.STANDARD
             }
 
-        // Reset per-session distance and GPS interval tracking.
-        cumulativeDistanceMeters = 0.0
+        // Seed distance from the value persisted by the poll loop every ~3 s. This ensures the
+        // foreground notification shows the correct total distance immediately after a process kill
+        // + START_STICKY restart, rather than briefly showing 0.0 km.
+        cumulativeDistanceMeters = try {
+            sessionRepo.getSessionById(sessionId)?.distanceMeters ?: 0.0
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not read persisted distance for session $sessionId, starting from 0", e)
+            0.0
+        }
         prevLat = null
         prevLng = null
         currentGpsIntervalMs = currentProfile.movingIntervalMs
@@ -504,6 +512,12 @@ class LocationTrackingService : Service() {
      * Called after every buffer flush and gallery scan — at most once per ~60 s during
      * normal movement, so the DB query cost is negligible.
      *
+     * Uses [startForeground] rather than [android.app.NotificationManager.notify] so the
+     * notification is re-shown even if the user dismissed it. On Android 13+ (API 33+),
+     * [setOngoing(true)] no longer prevents swipe-to-dismiss for foreground service
+     * notifications, and [notify] silently respects the dismissal. [startForeground] re-asserts
+     * the foreground state and forces the notification visible regardless of prior dismissal.
+     *
      * Must be called from within [serviceScope] (already on IO thread).
      */
     private suspend fun updateNotification() {
@@ -523,8 +537,7 @@ class LocationTrackingService : Service() {
                 textCount      = textCount,
                 voiceCount     = voiceCount,
             )
-            getSystemService(NotificationManager::class.java)
-                .notify(NOTIFICATION_ID, notification)
+            startForeground(NOTIFICATION_ID, notification)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to update notification stats", e)
         }

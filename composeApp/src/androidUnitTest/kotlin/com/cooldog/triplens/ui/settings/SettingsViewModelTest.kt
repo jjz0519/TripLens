@@ -49,10 +49,12 @@ class SettingsViewModelTest {
         override suspend fun setOnboardingComplete()                   { onboardingComplete = true }
         override suspend fun getLanguage()                             = language
         override suspend fun setLanguage(l: Language)                  { language = l }
-        override suspend fun getAccuracyProfile()                      = accuracyProfile
-        override suspend fun setAccuracyProfile(p: AccuracyProfile)    { accuracyProfile = p }
-        override suspend fun getScanInterval()                         = scanInterval
-        override suspend fun setScanInterval(i: ScanInterval)          { scanInterval = i }
+        override suspend fun getAccuracyProfile()                                       = accuracyProfile
+        override suspend fun setAccuracyProfile(p: AccuracyProfile)                    { accuracyProfile = p }
+        override suspend fun getScanInterval()                                          = scanInterval
+        override suspend fun setScanInterval(i: ScanInterval)                          { scanInterval = i }
+        override suspend fun getPalette()                                               = com.cooldog.triplens.ui.theme.Palette.MOSS
+        override suspend fun setPalette(palette: com.cooldog.triplens.ui.theme.Palette) = Unit
     }
 
     private fun buildViewModel(

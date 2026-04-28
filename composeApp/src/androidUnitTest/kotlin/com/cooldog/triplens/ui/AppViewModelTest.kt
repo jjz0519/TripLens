@@ -15,10 +15,10 @@ import org.junit.Before
 import org.junit.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
-import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 
 /**
- * Unit tests for [AppViewModel]'s start destination logic and orphaned session recovery.
+ * Unit tests for [AppViewModel]'s start destination logic and session auto-resume.
  *
  * Uses [StandardTestDispatcher] so coroutines don't execute until [advanceUntilIdle] is called.
  * This allows verifying both the initial [AppViewModel.StartDestination.Loading] state and
@@ -30,12 +30,10 @@ import kotlin.test.assertNotNull
 @OptIn(ExperimentalCoroutinesApi::class)
 class AppViewModelTest {
 
-    // StandardTestDispatcher: coroutines are scheduled but not executed until explicitly advanced.
     private val testDispatcher: TestDispatcher = StandardTestDispatcher()
 
     @Before
     fun setUp() {
-        // Override Dispatchers.Main so viewModelScope.launch uses the test dispatcher.
         Dispatchers.setMain(testDispatcher)
     }
 
@@ -50,16 +48,14 @@ class AppViewModelTest {
 
     private fun buildViewModel(
         activeSession: Session?,
-        isOnboardingComplete: Boolean = true,  // default keeps existing tests unaffected
+        isOnboardingComplete: Boolean = true,
         isServiceRunning: Boolean = false,
-        resumeOrphanedSessionFn: suspend (String, String) -> Unit = { _, _ -> },
-        discardOrphanedSessionFn: (String) -> Unit = {},
+        resumeOrphanedSessionFn: suspend (Session) -> Unit = {},
     ): AppViewModel = AppViewModel(
         getActiveSessionFn       = { activeSession },
         isOnboardingCompleteFn   = { isOnboardingComplete },
         isServiceRunningFn       = { isServiceRunning },
         resumeOrphanedSessionFn  = resumeOrphanedSessionFn,
-        discardOrphanedSessionFn = discardOrphanedSessionFn,
         ioDispatcher             = testDispatcher,
     )
 
@@ -73,12 +69,11 @@ class AppViewModelTest {
     )
 
     // ------------------------------------------------------------------
-    // Tests
+    // Start destination — basic routing
     // ------------------------------------------------------------------
 
     @Test
     fun startDestination_isLoading_beforeCoroutineRuns() = runTest(testDispatcher) {
-        // StandardTestDispatcher: the init-block launch is queued but not yet executed.
         val vm = buildViewModel(activeSession = null)
         assertEquals(
             AppViewModel.StartDestination.Loading,
@@ -91,30 +86,21 @@ class AppViewModelTest {
     fun startDestination_isTripList_whenNoActiveSession() = runTest(testDispatcher) {
         val vm = buildViewModel(activeSession = null)
         advanceUntilIdle()
-        assertEquals(
-            AppViewModel.StartDestination.TripList,
-            vm.startDestination.value,
-            "startDestination must be TripList when getActiveSession returns null",
-        )
+        assertEquals(AppViewModel.StartDestination.TripList, vm.startDestination.value)
     }
 
     @Test
     fun startDestination_isRecording_whenActiveSessionExistsAndServiceRunning() = runTest(testDispatcher) {
         val vm = buildViewModel(activeSession = aRecordingSession, isServiceRunning = true)
         advanceUntilIdle()
-        assertEquals(
-            AppViewModel.StartDestination.Recording,
-            vm.startDestination.value,
-            "startDestination must be Recording when getActiveSession returns a session and service is running",
-        )
+        assertEquals(AppViewModel.StartDestination.Recording, vm.startDestination.value)
     }
 
     @Test
     fun startDestination_isTripList_whenQueryThrows() = runTest(testDispatcher) {
-        // DB errors (corruption, permission denial) must not crash the app or leave it on Loading.
         val vm = AppViewModel(
             getActiveSessionFn = { throw RuntimeException("DB corrupted") },
-            isOnboardingCompleteFn = { true },   // onboarding complete; only session query fails
+            isOnboardingCompleteFn = { true },
             ioDispatcher = testDispatcher,
         )
         advanceUntilIdle()
@@ -129,11 +115,7 @@ class AppViewModelTest {
     fun startDestination_isOnboarding_whenOnboardingNotComplete() = runTest(testDispatcher) {
         val vm = buildViewModel(activeSession = null, isOnboardingComplete = false)
         advanceUntilIdle()
-        assertEquals(
-            AppViewModel.StartDestination.Onboarding,
-            vm.startDestination.value,
-            "startDestination must be Onboarding when onboarding has not been completed",
-        )
+        assertEquals(AppViewModel.StartDestination.Onboarding, vm.startDestination.value)
     }
 
     @Test
@@ -155,105 +137,86 @@ class AppViewModelTest {
     }
 
     // ------------------------------------------------------------------
-    // Orphaned session recovery (Task 18)
+    // Orphaned session auto-resume (service was dead on cold start)
     // ------------------------------------------------------------------
 
     @Test
-    fun recoverySession_isSet_whenSessionExistsButServiceNotRunning() = runTest(testDispatcher) {
-        // Session in DB but service is gone (neither runningInstance nor SharedPrefs marker).
+    fun startDestination_isRecording_whenSessionExistsButServiceNotRunning() = runTest(testDispatcher) {
+        // Service is gone but DB has a recording session — must auto-resume to Recording.
         val vm = buildViewModel(activeSession = aRecordingSession, isServiceRunning = false)
         advanceUntilIdle()
-        assertNotNull(
-            vm.recoverySession.value,
-            "recoverySession must be non-null when session exists but service is not running",
-        )
-        assertEquals(
-            AppViewModel.StartDestination.TripList,
-            vm.startDestination.value,
-            "startDestination must be TripList (not Recording) when an orphaned session is detected",
-        )
-    }
-
-    @Test
-    fun onRecoveryResume_navigatesToRecordingAndClearsDialog() = runTest(testDispatcher) {
-        val resumeCalls = mutableListOf<Pair<String, String>>()
-        val vm = buildViewModel(
-            activeSession           = aRecordingSession,
-            isServiceRunning        = false,
-            resumeOrphanedSessionFn = { orphanId, groupId -> resumeCalls += orphanId to groupId },
-        )
-        advanceUntilIdle()
-        assertNotNull(vm.recoverySession.value, "precondition: recovery dialog should be showing")
-
-        vm.onRecoveryResume()
-        advanceUntilIdle()
-
-        assertNull(vm.recoverySession.value, "recoverySession must be null after Resume")
         assertEquals(
             AppViewModel.StartDestination.Recording,
             vm.startDestination.value,
-            "startDestination must switch to Recording after Resume",
+            "startDestination must be Recording for orphaned sessions (auto-resume, no dialog)",
         )
-        assertEquals(1, resumeCalls.size, "resumeOrphanedSessionFn must be called exactly once")
-        assertEquals("s1" to "g1", resumeCalls.first(), "resumeOrphanedSessionFn called with correct ids")
     }
 
     @Test
-    fun onRecoveryDiscard_staysOnTripListAndClearsDialog() = runTest(testDispatcher) {
-        val discardCalls = mutableListOf<String>()
-        val vm = buildViewModel(
-            activeSession            = aRecordingSession,
-            isServiceRunning         = false,
-            discardOrphanedSessionFn = { orphanId -> discardCalls += orphanId },
-        )
+    fun isSessionActive_isTrue_whenOrphanedSessionAutoResumed() = runTest(testDispatcher) {
+        val vm = buildViewModel(activeSession = aRecordingSession, isServiceRunning = false)
         advanceUntilIdle()
-        assertNotNull(vm.recoverySession.value, "precondition: recovery dialog should be showing")
-
-        vm.onRecoveryDiscard()
-        advanceUntilIdle()
-
-        assertNull(vm.recoverySession.value, "recoverySession must be null after Discard")
-        assertEquals(
-            AppViewModel.StartDestination.TripList,
-            vm.startDestination.value,
-            "startDestination must remain TripList after Discard",
+        assertTrue(
+            vm.isSessionActive.value,
+            "isSessionActive must be true when an orphaned session is auto-resumed",
         )
-        assertEquals(1, discardCalls.size, "discardOrphanedSessionFn must be called exactly once")
-        assertEquals("s1", discardCalls.first(), "discardOrphanedSessionFn called with correct session id")
     }
 
     @Test
-    fun onRecoveryResume_resumeFnThrows_dialogRemainsVisibleForRetry() = runTest(testDispatcher) {
-        // If resumeOrphanedSessionFn fails (e.g. service start denied), the dialog must stay
-        // visible so the user can retry or choose Discard — the orphaned session must not be
-        // silently dropped, which would cause it to re-appear on every cold start instead.
+    fun resumeOrphanedSessionFn_calledOnce_withCorrectSession_whenServiceDead() = runTest(testDispatcher) {
+        val resumedSessions = mutableListOf<Session>()
         val vm = buildViewModel(
             activeSession           = aRecordingSession,
             isServiceRunning        = false,
-            resumeOrphanedSessionFn = { _, _ -> throw RuntimeException("Service start failed") },
+            resumeOrphanedSessionFn = { session -> resumedSessions += session },
         )
         advanceUntilIdle()
-        assertNotNull(vm.recoverySession.value, "precondition: recovery dialog should be showing")
+        assertEquals(1, resumedSessions.size, "resumeOrphanedSessionFn must be called exactly once")
+        assertEquals(aRecordingSession, resumedSessions.first(), "must pass the original session")
+    }
 
-        vm.onRecoveryResume()
+    @Test
+    fun startDestination_stillRecording_whenResumeOrphanedSessionFnThrows() = runTest(testDispatcher) {
+        // Even if the service fails to restart, we still route to Recording so RecordingViewModel
+        // can rehydrate from the DB and the user can tap Stop.
+        val vm = buildViewModel(
+            activeSession           = aRecordingSession,
+            isServiceRunning        = false,
+            resumeOrphanedSessionFn = { throw RuntimeException("Service start denied") },
+        )
         advanceUntilIdle()
-
-        assertNotNull(vm.recoverySession.value, "recoverySession must remain non-null after a failed resume so dialog stays visible")
         assertEquals(
-            AppViewModel.StartDestination.TripList,
+            AppViewModel.StartDestination.Recording,
             vm.startDestination.value,
-            "startDestination must remain TripList after a failed resume",
+            "startDestination must still be Recording even if service restart throws",
         )
     }
 
     @Test
-    fun recoverySession_isNull_whenSessionExistsAndServiceRunning() = runTest(testDispatcher) {
-        // Service is alive (START_STICKY recovered or normal active session) — no recovery needed.
+    fun recoverySession_notExposedAsProperty() = runTest(testDispatcher) {
+        // Verifies that AppViewModel no longer exposes recoverySession (dialog was removed).
+        // The test simply instantiates and uses the ViewModel without referencing the old field.
+        val vm = buildViewModel(activeSession = aRecordingSession, isServiceRunning = false)
+        advanceUntilIdle()
+        // If this compiles and runs, the old recoverySession field is gone.
+        assertEquals(AppViewModel.StartDestination.Recording, vm.startDestination.value)
+    }
+
+    // ------------------------------------------------------------------
+    // isSessionActive
+    // ------------------------------------------------------------------
+
+    @Test
+    fun isSessionActive_isFalse_whenNoActiveSession() = runTest(testDispatcher) {
+        val vm = buildViewModel(activeSession = null)
+        advanceUntilIdle()
+        assertEquals(false, vm.isSessionActive.value)
+    }
+
+    @Test
+    fun isSessionActive_isTrue_whenActiveSessionAndServiceRunning() = runTest(testDispatcher) {
         val vm = buildViewModel(activeSession = aRecordingSession, isServiceRunning = true)
         advanceUntilIdle()
-        assertNull(
-            vm.recoverySession.value,
-            "recoverySession must be null when service is running alongside the active session",
-        )
+        assertTrue(vm.isSessionActive.value)
     }
 }

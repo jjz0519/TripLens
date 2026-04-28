@@ -2,6 +2,7 @@ package com.cooldog.triplens.ui.recording
 
 import com.cooldog.triplens.model.MediaReference
 import com.cooldog.triplens.model.Note
+import com.cooldog.triplens.model.Session
 import com.cooldog.triplens.model.TrackPoint
 import com.cooldog.triplens.platform.AccuracyProfile
 import com.cooldog.triplens.platform.AudioRecorder
@@ -22,6 +23,21 @@ import kotlinx.coroutines.Dispatchers
  * [com.cooldog.triplens.di.androidModule] wires the real calls; unit tests supply fakes.
  */
 data class RecordingDeps(
+
+    // ── Rehydration (cold-start with an active session already in DB) ─────────────
+
+    /**
+     * Returns the current active (status=recording) session, or null if none. Called in init
+     * to rehydrate [RecordingViewModel.UiState.ActiveRecording] after a process kill.
+     */
+    val getActiveSessionFn: suspend () -> Session? = { null },
+
+    /**
+     * Returns the name of the TripGroup for the given [groupId], used to populate
+     * [RecordingViewModel.UiState.ActiveRecording.groupName] during rehydration.
+     * Falls back to the session name if the group is not found.
+     */
+    val getGroupNameFn: (groupId: String) -> String? = { null },
 
     // ── Idle → Active transition ──────────────────────────────────────────────────
 

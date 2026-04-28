@@ -5,6 +5,8 @@ import com.cooldog.triplens.model.MediaSource
 import com.cooldog.triplens.model.MediaType
 import com.cooldog.triplens.model.Note
 import com.cooldog.triplens.model.NoteType
+import com.cooldog.triplens.model.Session
+import com.cooldog.triplens.model.SessionStatus
 import com.cooldog.triplens.model.TrackPoint
 import com.cooldog.triplens.model.TransportMode
 import com.cooldog.triplens.platform.AccuracyProfile
@@ -533,6 +535,151 @@ class RecordingViewModelActiveTest {
 
         val state = assertIs<RecordingViewModel.UiState.ActiveRecording>(vm.uiState.value)
         assertTrue(state.isCameraFollowing)
+    }
+
+    // ── Rehydration tests ────────────────────────────────────────────────────────
+
+    /**
+     * Builds a ViewModel that will find an active session on construction (simulates cold-start
+     * after process kill where DB still has a recording row).
+     *
+     * [sessionStartTime] defaults to [FIXED_EPOCH] - 30_000L so the expected elapsedSeconds
+     * = (FIXED_EPOCH - sessionStartTime) / 1000 = 30.
+     */
+    private fun buildViewModelWithActiveSession(
+        sessionId: String = "existing-session",
+        groupName: String = "2026-01-15",
+        sessionStartTime: Long = FIXED_EPOCH - 30_000L,
+    ) = RecordingViewModel(
+        RecordingDeps(
+            getActiveSessionFn = {
+                Session(
+                    id        = sessionId,
+                    groupId   = "g1",
+                    name      = groupName,
+                    startTime = sessionStartTime,
+                    endTime   = null,
+                    status    = SessionStatus.RECORDING,
+                )
+            },
+            getGroupNameFn     = { groupName },
+            createGroupFn        = { _, _, _ -> },
+            createSessionFn      = { _, _, _, _ -> },
+            getAccuracyProfileFn = { AccuracyProfile.STANDARD },
+            startService         = { _, _, _ -> },
+            getTrackPointsFn   = { fakeTrackPoints },
+            getMediaRefsFn     = { fakeMediaRefs },
+            getNotesFn         = { fakeNotes },
+            createTextNoteFn   = { _, _, _, _, _, _ -> },
+            createVoiceNoteFn  = { _, _, _, _, _, _, _ -> },
+            completeSessionFn  = { _, _ -> },
+            setDistanceFn      = { _, _ -> },
+            stopServiceFn      = {},
+            audioRecorder      = FakeAudioRecorder().also { fakeRecorder = it },
+            clock              = { FIXED_EPOCH },
+            ioDispatcher       = testDispatcher,
+        )
+    ).also { viewModels.add(it) }
+
+    @Test
+    fun rehydration_transitionsToActiveRecording_whenActiveSessionFound() = runRecordingTest {
+        val vm = buildViewModelWithActiveSession(sessionId = "existing-session")
+        runCurrent()
+        val state = assertIs<RecordingViewModel.UiState.ActiveRecording>(vm.uiState.value)
+        assertEquals("existing-session", state.sessionId)
+    }
+
+    @Test
+    fun rehydration_setsGroupName_fromGetGroupNameFn() = runRecordingTest {
+        val vm = buildViewModelWithActiveSession(groupName = "2026-04-01")
+        runCurrent()
+        val state = assertIs<RecordingViewModel.UiState.ActiveRecording>(vm.uiState.value)
+        assertEquals("2026-04-01", state.groupName)
+    }
+
+    @Test
+    fun rehydration_seedsElapsedSeconds_fromSessionStartTime() = runRecordingTest {
+        // clock = FIXED_EPOCH (0), sessionStartTime = FIXED_EPOCH - 30_000 → elapsed = 30 s
+        val vm = buildViewModelWithActiveSession(sessionStartTime = FIXED_EPOCH - 30_000L)
+        runCurrent()
+        val state = assertIs<RecordingViewModel.UiState.ActiveRecording>(vm.uiState.value)
+        assertEquals(30L, state.elapsedSeconds)
+    }
+
+    @Test
+    fun rehydration_startsTimerLoop_continuesIncrementingAfterSeed() = runRecordingTest {
+        val vm = buildViewModelWithActiveSession(sessionStartTime = FIXED_EPOCH - 10_000L)
+        runCurrent()  // seed: elapsed = 10
+
+        advanceTimeBy(3_001L)
+
+        val state = assertIs<RecordingViewModel.UiState.ActiveRecording>(vm.uiState.value)
+        assertEquals(13L, state.elapsedSeconds)
+    }
+
+    @Test
+    fun rehydration_startsPollingLoop_populatesTrackPoints() = runRecordingTest {
+        fakeTrackPoints = listOf(makeTrackPoint(id = 1L))
+        val vm = buildViewModelWithActiveSession()
+        runCurrent()  // rehydration + first poll
+        val state = assertIs<RecordingViewModel.UiState.ActiveRecording>(vm.uiState.value)
+        assertEquals(1, state.trackPoints.size)
+    }
+
+    @Test
+    fun rehydration_doesNotFire_whenGetActiveSessionFnReturnsNull() = runRecordingTest {
+        // Default buildViewModel() has getActiveSessionFn = { null } → stays Idle.
+        val vm = buildViewModel()
+        runCurrent()
+        assertIs<RecordingViewModel.UiState.Idle>(vm.uiState.value)
+    }
+
+    @Test
+    fun rehydration_doesNotFire_whenStateIsNoLongerIdle() = runRecordingTest {
+        // If onStartTapped was called before rehydration runs (very unlikely race), the guard
+        // prevents double-entering ActiveRecording. Simulate by using a suspending lambda that
+        // yields control so onStartTapped can run first.
+        var allowRehydration = false
+        val vm = RecordingViewModel(
+            RecordingDeps(
+                getActiveSessionFn = {
+                    // Suspend until onStartTapped has already moved state to StartingSession.
+                    while (!allowRehydration) kotlinx.coroutines.delay(1L)
+                    Session(
+                        id = "late-session", groupId = "g1", name = "Day 1",
+                        startTime = FIXED_EPOCH, endTime = null, status = SessionStatus.RECORDING,
+                    )
+                },
+                getGroupNameFn       = { "Day 1" },
+                createGroupFn        = { _, _, _ -> },
+                createSessionFn      = { _, _, _, _ -> },
+                getAccuracyProfileFn = { AccuracyProfile.STANDARD },
+                startService         = { _, _, _ -> },
+                getTrackPointsFn   = { emptyList() },
+                getMediaRefsFn     = { emptyList() },
+                getNotesFn         = { emptyList() },
+                createTextNoteFn   = { _, _, _, _, _, _ -> },
+                createVoiceNoteFn  = { _, _, _, _, _, _, _ -> },
+                completeSessionFn  = { _, _ -> },
+                setDistanceFn      = { _, _ -> },
+                stopServiceFn      = {},
+                audioRecorder      = FakeAudioRecorder().also { fakeRecorder = it },
+                clock              = { FIXED_EPOCH },
+                ioDispatcher       = testDispatcher,
+            )
+        ).also { viewModels.add(it) }
+
+        // Let onStartTapped run first, which moves state to StartingSession.
+        vm.onStartTapped(locationGranted = true)
+        runCurrent()
+        // Now unblock the rehydration lambda; it should observe state != Idle and abort.
+        allowRehydration = true
+        runCurrent()
+
+        // State is ActiveRecording from onStartTapped, not "late-session" from rehydration.
+        val state = assertIs<RecordingViewModel.UiState.ActiveRecording>(vm.uiState.value)
+        // The session id will NOT be "late-session" — it's the UUID created by onStartTapped.
+        assertTrue(state.sessionId != "late-session", "rehydration must not override onStartTapped state")
     }
 
     // ── Factory helpers ──────────────────────────────────────────────────────────

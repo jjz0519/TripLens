@@ -128,28 +128,19 @@ val androidModule = module {
                     .contains(LocationTrackingService.PREFS_SESSION_ID)
             },
 
-            // Resume: mark the orphaned session interrupted, create a new session in the
-            // same group, and start LocationTrackingService with the new session's ID.
-            resumeOrphanedSessionFn = { orphanedSessionId, groupId ->
-                get<SessionRepository>().markInterrupted(orphanedSessionId)
-                val newId   = java.util.UUID.randomUUID().toString()
-                val now     = System.currentTimeMillis()
-                val name    = ctx.getString(R.string.session_default_name)
-                get<SessionRepository>().createSession(newId, groupId, name, now)
+            // Service died but the session is still recording in the DB — restart it against
+            // the same sessionId so all existing track points remain attached to it.
+            // No markInterrupted, no new session row.
+            resumeOrphanedSessionFn = { session ->
                 val profile = get<AppPreferences>().getAccuracyProfile()
                 ContextCompat.startForegroundService(ctx,
                     Intent(ctx, LocationTrackingService::class.java).apply {
                         action = LocationTrackingService.ACTION_START
-                        putExtra(LocationTrackingService.EXTRA_SESSION_ID, newId)
+                        putExtra(LocationTrackingService.EXTRA_SESSION_ID, session.id)
                         putExtra(LocationTrackingService.EXTRA_ACCURACY_PROFILE, profile.name)
-                        putExtra(LocationTrackingService.EXTRA_SESSION_START_TIME, now)
+                        putExtra(LocationTrackingService.EXTRA_SESSION_START_TIME, session.startTime)
                     }
                 )
-            },
-
-            // Discard: mark the orphaned session interrupted; no new session is created.
-            discardOrphanedSessionFn = { orphanedSessionId ->
-                get<SessionRepository>().markInterrupted(orphanedSessionId)
             },
             getPaletteFn = { get<AppPreferences>().getPalette() },
         )
@@ -171,6 +162,10 @@ val androidModule = module {
         val ctx = androidContext()
         RecordingViewModel(
             deps = RecordingDeps(
+                // ── Rehydration after process kill ────────────────────────────────────
+                getActiveSessionFn = { get<SessionRepository>().getActiveSession() },
+                getGroupNameFn = { groupId -> get<TripRepository>().getGroupById(groupId)?.name },
+
                 // ── Idle → Active transition ──────────────────────────────────────────
                 createGroupFn = { id, name, now ->
                     get<TripRepository>().createGroup(id, name, now)
